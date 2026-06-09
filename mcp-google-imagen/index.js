@@ -1,18 +1,34 @@
 #!/usr/bin/env node
-import { GoogleGenAI } from "@google/genai";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
+import https from "https";
 import fs from "fs";
-import path from "path";
 
-const API_KEY = process.env.GEMINI_API_KEY;
+const POLLINATIONS_URL = "https://image.pollinations.ai/prompt/";
+
+function fetchImage(url) {
+  return new Promise((resolve, reject) => {
+    const chunks = [];
+    https.get(url, { headers: { "User-Agent": "mcp-pollinations/1.0" } }, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        return fetchImage(res.headers.location).then(resolve).catch(reject);
+      }
+      if (res.statusCode !== 200) {
+        return reject(new Error(`HTTP ${res.statusCode}`));
+      }
+      res.on("data", (chunk) => chunks.push(chunk));
+      res.on("end", () => resolve(Buffer.concat(chunks)));
+      res.on("error", reject);
+    }).on("error", reject);
+  });
+}
 
 const server = new Server(
-  { name: "google-imagen", version: "1.0.0" },
+  { name: "pollinations-imagen", version: "2.0.0" },
   { capabilities: { tools: {} } }
 );
 
@@ -21,7 +37,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "generate_image",
       description:
-        "Generate an image using Google Gemini (Imagen / Nano Banana Pro model from labs.google). Returns the image saved to disk and its base64 data.",
+        "Generate an image for free using Pollinations.ai (no API key needed). Supports multiple models including flux, turbo, gptimage, and more.",
       inputSchema: {
         type: "object",
         properties: {
@@ -31,172 +47,100 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
           output_path: {
             type: "string",
-            description:
-              "Optional file path to save the image (e.g. /tmp/image.png). Defaults to /tmp/gemini-image.png",
+            description: "File path to save the image. Defaults to /tmp/pollinations-image.png",
           },
-          aspect_ratio: {
+          width: {
+            type: "number",
+            description: "Image width in pixels (default: 1024)",
+          },
+          height: {
+            type: "number",
+            description: "Image height in pixels (default: 1024)",
+          },
+          model: {
             type: "string",
-            enum: ["1:1", "16:9", "9:16", "4:3", "3:4"],
-            description: "Aspect ratio of the generated image. Default: 1:1",
+            enum: ["flux", "flux-realism", "flux-anime", "flux-3d", "turbo", "gptimage"],
+            description: "Model to use. Default: flux",
+          },
+          seed: {
+            type: "number",
+            description: "Seed for reproducible results",
+          },
+          enhance: {
+            type: "boolean",
+            description: "Enhance prompt automatically (default: false)",
           },
         },
         required: ["prompt"],
       },
     },
     {
-      name: "edit_image",
-      description:
-        "Edit or transform an existing image using Google Gemini with a text instruction.",
-      inputSchema: {
-        type: "object",
-        properties: {
-          prompt: {
-            type: "string",
-            description: "Instruction for how to edit the image",
-          },
-          image_path: {
-            type: "string",
-            description: "Path to the input image file",
-          },
-          output_path: {
-            type: "string",
-            description: "Optional path to save the result. Defaults to /tmp/gemini-edited.png",
-          },
-        },
-        required: ["prompt", "image_path"],
-      },
+      name: "list_models",
+      description: "List all available free image generation models from Pollinations.ai",
+      inputSchema: { type: "object", properties: {} },
     },
   ],
 }));
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  if (!API_KEY) {
+  if (request.params.name === "list_models") {
     return {
       content: [
         {
           type: "text",
-          text: "Error: GEMINI_API_KEY environment variable is not set. Get a free key at https://aistudio.google.com/apikey",
+          text: `Available free models on Pollinations.ai:\n\n- flux (default) — High quality, general purpose\n- flux-realism — Photorealistic images\n- flux-anime — Anime/manga style\n- flux-3d — 3D rendered style\n- turbo — Faster generation\n- gptimage — GPT-based image generation`,
         },
       ],
-      isError: true,
     };
   }
 
-  const ai = new GoogleGenAI({ apiKey: API_KEY });
-
   if (request.params.name === "generate_image") {
-    const { prompt, output_path, aspect_ratio } = request.params.arguments;
-    const outPath = output_path || "/tmp/gemini-image.png";
+    const {
+      prompt,
+      output_path,
+      width = 1024,
+      height = 1024,
+      model = "flux",
+      seed,
+      enhance = false,
+    } = request.params.arguments;
+
+    const outPath = output_path || "/tmp/pollinations-image.png";
 
     try {
-      const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash-preview-image-generation",
-        contents: prompt,
-        config: {
-          responseModalities: ["TEXT", "IMAGE"],
-          ...(aspect_ratio && { aspectRatio: aspect_ratio }),
-        },
+      const encodedPrompt = encodeURIComponent(prompt);
+      const params = new URLSearchParams({
+        width: width.toString(),
+        height: height.toString(),
+        model,
+        nologo: "true",
+        enhance: enhance.toString(),
+        ...(seed !== undefined && { seed: seed.toString() }),
       });
 
-      let imageData = null;
-      let textResponse = "";
+      const url = `${POLLINATIONS_URL}${encodedPrompt}?${params}`;
 
-      for (const part of response.candidates[0].content.parts) {
-        if (part.text) {
-          textResponse = part.text;
-        } else if (part.inlineData) {
-          imageData = part.inlineData.data;
-          const buffer = Buffer.from(imageData, "base64");
-          fs.writeFileSync(outPath, buffer);
-        }
-      }
+      const imageBuffer = await fetchImage(url);
+      fs.writeFileSync(outPath, imageBuffer);
 
-      if (!imageData) {
-        return {
-          content: [{ type: "text", text: "No image was generated. " + textResponse }],
-          isError: true,
-        };
-      }
+      const base64 = imageBuffer.toString("base64");
 
       return {
         content: [
           {
             type: "text",
-            text: `Image generated successfully!\nSaved to: ${outPath}\n${textResponse ? "\nModel note: " + textResponse : ""}`,
+            text: `Image generated successfully!\nModel: ${model}\nSize: ${width}x${height}\nSaved to: ${outPath}`,
           },
           {
             type: "image",
-            data: imageData,
-            mimeType: "image/png",
+            data: base64,
+            mimeType: "image/jpeg",
           },
         ],
       };
     } catch (err) {
       return {
-        content: [{ type: "text", text: `Generation error: ${err.message}` }],
-        isError: true,
-      };
-    }
-  }
-
-  if (request.params.name === "edit_image") {
-    const { prompt, image_path, output_path } = request.params.arguments;
-    const outPath = output_path || "/tmp/gemini-edited.png";
-
-    try {
-      if (!fs.existsSync(image_path)) {
-        return {
-          content: [{ type: "text", text: `File not found: ${image_path}` }],
-          isError: true,
-        };
-      }
-
-      const imageBuffer = fs.readFileSync(image_path);
-      const base64Image = imageBuffer.toString("base64");
-      const ext = path.extname(image_path).toLowerCase();
-      const mimeMap = { ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp" };
-      const mimeType = mimeMap[ext] || "image/png";
-
-      const response = await ai.models.generateContent({
-        model: "gemini-2.0-flash-preview-image-generation",
-        contents: [
-          {
-            parts: [
-              { text: prompt },
-              { inlineData: { mimeType, data: base64Image } },
-            ],
-          },
-        ],
-        config: { responseModalities: ["TEXT", "IMAGE"] },
-      });
-
-      let imageData = null;
-      let textResponse = "";
-
-      for (const part of response.candidates[0].content.parts) {
-        if (part.text) textResponse = part.text;
-        else if (part.inlineData) {
-          imageData = part.inlineData.data;
-          fs.writeFileSync(outPath, Buffer.from(imageData, "base64"));
-        }
-      }
-
-      if (!imageData) {
-        return {
-          content: [{ type: "text", text: "No image returned. " + textResponse }],
-          isError: true,
-        };
-      }
-
-      return {
-        content: [
-          { type: "text", text: `Image edited successfully!\nSaved to: ${outPath}` },
-          { type: "image", data: imageData, mimeType: "image/png" },
-        ],
-      };
-    } catch (err) {
-      return {
-        content: [{ type: "text", text: `Edit error: ${err.message}` }],
+        content: [{ type: "text", text: `Error generating image: ${err.message}` }],
         isError: true,
       };
     }
