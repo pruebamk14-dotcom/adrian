@@ -8,27 +8,55 @@ import {
 import https from "https";
 import fs from "fs";
 
-const POLLINATIONS_URL = "https://image.pollinations.ai/prompt/";
+const PUTER_API = "api.puter.com";
+const PUTER_TOKEN = process.env.PUTER_TOKEN || "";
 
-function fetchImage(url) {
+function puterImageCall(prompt, model, token) {
   return new Promise((resolve, reject) => {
+    const body = JSON.stringify({
+      interface: "puter-image-generation",
+      driver: "ai-image",
+      method: "generate",
+      args: { prompt, model },
+      auth_token: token,
+    });
+
+    const options = {
+      hostname: PUTER_API,
+      path: "/drivers/call",
+      method: "POST",
+      headers: {
+        "Content-Type": "text/plain;actually=json",
+        "Content-Length": Buffer.byteLength(body),
+      },
+    };
+
     const chunks = [];
-    https.get(url, { headers: { "User-Agent": "mcp-pollinations/1.0" } }, (res) => {
-      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-        return fetchImage(res.headers.location).then(resolve).catch(reject);
-      }
-      if (res.statusCode !== 200) {
-        return reject(new Error(`HTTP ${res.statusCode}`));
-      }
+    const req = https.request(options, (res) => {
       res.on("data", (chunk) => chunks.push(chunk));
-      res.on("end", () => resolve(Buffer.concat(chunks)));
+      res.on("end", () => {
+        const buf = Buffer.concat(chunks);
+        // If response looks like JSON error, parse it
+        const first = buf[0];
+        if (first === 123) { // '{'
+          try {
+            const json = JSON.parse(buf.toString());
+            return reject(new Error(json?.error?.message || JSON.stringify(json)));
+          } catch (_) {}
+        }
+        resolve(buf);
+      });
       res.on("error", reject);
-    }).on("error", reject);
+    });
+
+    req.on("error", reject);
+    req.write(body);
+    req.end();
   });
 }
 
 const server = new Server(
-  { name: "pollinations-imagen", version: "2.0.0" },
+  { name: "nano-banana-imagen", version: "3.0.0" },
   { capabilities: { tools: {} } }
 );
 
@@ -37,7 +65,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "generate_image",
       description:
-        "Generate an image for free using Pollinations.ai (no API key needed). Supports multiple models including flux, turbo, gptimage, and more.",
+        "Generate images using Google's Nano Banana models (Gemini image generation) for free via Puter.com. Nano Banana 2 = gemini-3.1-flash-image-preview. Requires a free Puter account token.",
       inputSchema: {
         type: "object",
         properties: {
@@ -45,111 +73,92 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             type: "string",
             description: "Description of the image to generate",
           },
-          output_path: {
-            type: "string",
-            description: "File path to save the image. Defaults to /tmp/pollinations-image.png",
-          },
-          width: {
-            type: "number",
-            description: "Image width in pixels (default: 1024)",
-          },
-          height: {
-            type: "number",
-            description: "Image height in pixels (default: 1024)",
-          },
           model: {
             type: "string",
-            enum: ["flux", "flux-realism", "flux-anime", "flux-3d", "turbo", "gptimage"],
-            description: "Model to use. Default: flux",
+            enum: [
+              "nano-banana",
+              "nano-banana-pro",
+              "gemini-3.1-flash-image-preview",
+              "gemini-3-pro-image-preview",
+              "gemini-2.5-flash-image-preview",
+            ],
+            description:
+              "Model to use. 'nano-banana' = Gemini 2.5 Flash Image, 'nano-banana-pro' = Gemini 3 Pro Image. Default: gemini-3.1-flash-image-preview (Nano Banana 2)",
           },
-          seed: {
-            type: "number",
-            description: "Seed for reproducible results",
-          },
-          enhance: {
-            type: "boolean",
-            description: "Enhance prompt automatically (default: false)",
+          output_path: {
+            type: "string",
+            description: "File path to save the image. Defaults to /tmp/nano-banana.png",
           },
         },
         required: ["prompt"],
       },
     },
-    {
-      name: "list_models",
-      description: "List all available free image generation models from Pollinations.ai",
-      inputSchema: { type: "object", properties: {} },
-    },
   ],
 }));
 
 server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  if (request.params.name === "list_models") {
+  if (request.params.name !== "generate_image") {
+    return {
+      content: [{ type: "text", text: `Unknown tool: ${request.params.name}` }],
+      isError: true,
+    };
+  }
+
+  if (!PUTER_TOKEN) {
     return {
       content: [
         {
           type: "text",
-          text: `Available free models on Pollinations.ai:\n\n- flux (default) — High quality, general purpose\n- flux-realism — Photorealistic images\n- flux-anime — Anime/manga style\n- flux-3d — 3D rendered style\n- turbo — Faster generation\n- gptimage — GPT-based image generation`,
+          text:
+            "Error: PUTER_TOKEN is not set.\n\n" +
+            "To get a free token:\n" +
+            "1. Create a free account at https://puter.com\n" +
+            "2. Open browser DevTools (F12) on puter.com\n" +
+            "3. Run: localStorage.getItem('puter.auth.token')\n" +
+            "4. Add PUTER_TOKEN=<token> to your .claude/settings.local.json env vars",
         },
       ],
+      isError: true,
     };
   }
 
-  if (request.params.name === "generate_image") {
-    const {
-      prompt,
-      output_path,
-      width = 1024,
-      height = 1024,
-      model = "flux",
-      seed,
-      enhance = false,
-    } = request.params.arguments;
+  const {
+    prompt,
+    model = "gemini-3.1-flash-image-preview",
+    output_path = "/tmp/nano-banana.png",
+  } = request.params.arguments;
 
-    const outPath = output_path || "/tmp/pollinations-image.png";
-
-    try {
-      const encodedPrompt = encodeURIComponent(prompt);
-      const params = new URLSearchParams({
-        width: width.toString(),
-        height: height.toString(),
-        model,
-        nologo: "true",
-        enhance: enhance.toString(),
-        ...(seed !== undefined && { seed: seed.toString() }),
-      });
-
-      const url = `${POLLINATIONS_URL}${encodedPrompt}?${params}`;
-
-      const imageBuffer = await fetchImage(url);
-      fs.writeFileSync(outPath, imageBuffer);
-
-      const base64 = imageBuffer.toString("base64");
-
-      return {
-        content: [
-          {
-            type: "text",
-            text: `Image generated successfully!\nModel: ${model}\nSize: ${width}x${height}\nSaved to: ${outPath}`,
-          },
-          {
-            type: "image",
-            data: base64,
-            mimeType: "image/jpeg",
-          },
-        ],
-      };
-    } catch (err) {
-      return {
-        content: [{ type: "text", text: `Error generating image: ${err.message}` }],
-        isError: true,
-      };
-    }
-  }
-
-  return {
-    content: [{ type: "text", text: `Unknown tool: ${request.params.name}` }],
-    isError: true,
+  // Map friendly names to model IDs
+  const modelMap = {
+    "nano-banana": "gemini-2.5-flash-image-preview",
+    "nano-banana-pro": "gemini-3-pro-image-preview",
   };
+  const resolvedModel = modelMap[model] || model;
+
+  try {
+    const imageBuffer = await puterImageCall(prompt, resolvedModel, PUTER_TOKEN);
+    fs.writeFileSync(output_path, imageBuffer);
+    const base64 = imageBuffer.toString("base64");
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: `Image generated with ${resolvedModel}!\nSaved to: ${output_path}`,
+        },
+        {
+          type: "image",
+          data: base64,
+          mimeType: "image/png",
+        },
+      ],
+    };
+  } catch (err) {
+    return {
+      content: [{ type: "text", text: `Error: ${err.message}` }],
+      isError: true,
+    };
+  }
 });
 
 const transport = new StdioServerTransport();

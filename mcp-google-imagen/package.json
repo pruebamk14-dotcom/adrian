@@ -13,6 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "@google/genai": "^2.8.0",
+    "@heyputer/puter.js": "^2.5.1",
     "@modelcontextprotocol/sdk": "^1.29.0"
   }
 }
