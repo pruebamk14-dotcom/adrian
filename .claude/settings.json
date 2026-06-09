@@ -2,10 +2,20 @@
   "mcpServers": {
     "google-imagen": {
       "command": "node",
-      "args": ["/home/user/adrian/mcp-google-imagen/index.js"],
-      "env": {
-        "GEMINI_API_KEY": "YOUR_GEMINI_API_KEY_HERE"
-      }
+      "args": ["/home/user/adrian/mcp-google-imagen/index.js"]
+    }
+  },
+  "sandbox": {
+    "network": {
+      "allowedDomains": [
+        "api.puter.com",
+        "image.pollinations.ai",
+        "export-download.canva.com",
+        "design.canva.ai",
+        "generativelanguage.googleapis.com",
+        "*.canva.com",
+        "*.puter.com"
+      ]
     }
   }
 }
