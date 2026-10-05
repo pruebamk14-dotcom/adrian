@@ -1,0 +1,421 @@
+--!strict
+-- Ciclo de vida del duelo 1v1: intro -> cuenta atrás -> ronda -> fin de ronda
+-- ... -> fin del duelo (recompensas, ELO, rachas) -> vuelta al lobby.
+
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local Shared = ReplicatedStorage:WaitForChild("Shared")
+local GameConfig = require(Shared.Config.GameConfig)
+local Rank = require(Shared.Rank)
+local Net = require(Shared.Net)
+
+local ArenaService = require(script.Parent.ArenaService)
+local CombatService = require(script.Parent.CombatService)
+local DataService = require(script.Parent.DataService)
+local LeaderboardService = require(script.Parent.LeaderboardService)
+
+type Duel = {
+	Id: number,
+	Players: { Player },
+	Arena: ArenaService.Arena,
+	Scores: { [Player]: number },
+	Kills: { [Player]: number },
+	Headshots: { [Player]: number },
+	Round: number,
+	State: string,
+	Ranked: boolean,
+	RoundToken: number,
+	RoundEndsAt: number,
+	LastKill: { Killer: Player, Victim: Player, Headshot: boolean, Distance: number, WeaponId: string }?,
+	Connections: { RBXScriptConnection },
+	Finished: boolean,
+}
+
+local DuelService = {}
+
+local duels: { [Player]: Duel } = {}
+local nextId = 0
+
+local function opponentOf(duel: Duel, player: Player): Player
+	return if duel.Players[1] == player then duel.Players[2] else duel.Players[1]
+end
+
+local function sendState(duel: Duel, extra: { [string]: any }?)
+	for _, p in duel.Players do
+		if p.Parent then
+			local opp = opponentOf(duel, p)
+			local payload = {
+				State = duel.State,
+				Round = duel.Round,
+				RoundsToWin = GameConfig.RoundsToWin,
+				MyScore = duel.Scores[p],
+				OppScore = duel.Scores[opp],
+				Opponent = opp,
+				OpponentName = opp.DisplayName,
+				OpponentElo = opp:GetAttribute("Elo"),
+				Arena = duel.Arena.Name,
+				Ranked = duel.Ranked,
+				EndsAt = duel.RoundEndsAt,
+			}
+			if extra then
+				for k, v in extra do
+					payload[k] = v
+				end
+				if extra.PerPlayer then
+					payload.PerPlayer = nil
+					for k, v in extra.PerPlayer[p] or {} do
+						payload[k] = v
+					end
+				end
+			end
+			Net.Event("DuelState"):FireClient(p, payload)
+		end
+	end
+end
+
+local function disconnectAll(duel: Duel)
+	for _, c in duel.Connections do
+		c:Disconnect()
+	end
+	table.clear(duel.Connections)
+end
+
+local function setFrozen(player: Player, frozen: boolean)
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	if root then
+		root.Anchored = frozen
+	end
+end
+
+local function clearHighlights(duel: Duel)
+	for _, p in duel.Players do
+		local h = p.Character and p.Character:FindFirstChild("RevealHighlight")
+		if h then
+			h:Destroy()
+		end
+	end
+end
+
+local roundOver: (duel: Duel, winner: Player?, reason: string) -> ()
+local endDuel: (duel: Duel, winner: Player, reason: string) -> ()
+
+local function spawnRound(duel: Duel)
+	if duel.Finished then
+		return
+	end
+	disconnectAll(duel)
+	duel.Round += 1
+	duel.RoundToken += 1
+	local token = duel.RoundToken
+	duel.LastKill = nil
+	duel.State = "Countdown"
+
+	-- Cargar ambos personajes en paralelo
+	local pending = 0
+	for i, p in duel.Players do
+		pending += 1
+		task.spawn(function()
+			if p.Parent then
+				p:LoadCharacter()
+				local char = p.Character
+				if char then
+					char:PivotTo(if i == 1 then duel.Arena.SpawnA else duel.Arena.SpawnB)
+					local hum = char:FindFirstChildOfClass("Humanoid")
+					if hum then
+						hum.MaxHealth = GameConfig.MaxHealth
+						hum.Health = GameConfig.MaxHealth
+					end
+				end
+				if duel.Round == 1 then
+					CombatService.Arm(p)
+				else
+					CombatService.ResetForRound(p)
+				end
+				CombatService.SetCanFire(p, false)
+				setFrozen(p, true)
+			end
+			pending -= 1
+		end)
+	end
+	local waitStart = os.clock()
+	while pending > 0 and os.clock() - waitStart < 10 do
+		task.wait()
+	end
+	if duel.Finished or duel.RoundToken ~= token then
+		return
+	end
+
+	-- Muerte por cualquier causa (caída, reset...) = punto para el rival
+	for _, p in duel.Players do
+		local hum = p.Character and p.Character:FindFirstChildOfClass("Humanoid")
+		if hum then
+			table.insert(
+				duel.Connections,
+				hum.Died:Connect(function()
+					task.delay(0.15, function()
+						if duel.RoundToken == token and duel.State == "Live" then
+							roundOver(duel, opponentOf(duel, p), "death")
+						end
+					end)
+				end)
+			)
+		end
+	end
+
+	duel.RoundEndsAt = workspace:GetServerTimeNow() + GameConfig.CountdownTime
+	sendState(duel, { Countdown = GameConfig.CountdownTime })
+	task.wait(GameConfig.CountdownTime)
+	if duel.Finished or duel.RoundToken ~= token then
+		return
+	end
+
+	duel.State = "Live"
+	duel.RoundEndsAt = workspace:GetServerTimeNow() + GameConfig.RoundMaxTime
+	for _, p in duel.Players do
+		setFrozen(p, false)
+		CombatService.SetCanFire(p, true)
+	end
+	sendState(duel)
+
+	-- Revelar posiciones contra el camping
+	task.delay(GameConfig.RevealAfter, function()
+		if duel.RoundToken ~= token or duel.State ~= "Live" then
+			return
+		end
+		for _, p in duel.Players do
+			if p.Character then
+				local h = Instance.new("Highlight")
+				h.Name = "RevealHighlight"
+				h.FillTransparency = 1
+				h.OutlineColor = Color3.fromRGB(255, 60, 60)
+				h.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+				h.Parent = p.Character
+			end
+			Net.Event("Notify"):FireClient(p, "¡Posiciones reveladas!", Color3.fromRGB(255, 80, 80))
+		end
+	end)
+
+	-- Límite de tiempo: gana quien tenga más vida
+	task.delay(GameConfig.RoundMaxTime, function()
+		if duel.RoundToken ~= token or duel.State ~= "Live" then
+			return
+		end
+		local a, b = duel.Players[1], duel.Players[2]
+		local function hp(p: Player): number
+			local h = p.Character and p.Character:FindFirstChildOfClass("Humanoid")
+			return h and h.Health or 0
+		end
+		if hp(a) > hp(b) then
+			roundOver(duel, a, "time")
+		elseif hp(b) > hp(a) then
+			roundOver(duel, b, "time")
+		else
+			roundOver(duel, nil, "draw")
+		end
+	end)
+end
+
+roundOver = function(duel: Duel, winner: Player?, reason: string)
+	if duel.Finished or duel.State ~= "Live" then
+		return
+	end
+	duel.State = "RoundEnd"
+	for _, p in duel.Players do
+		CombatService.SetCanFire(p, false)
+	end
+	clearHighlights(duel)
+
+	if winner then
+		duel.Scores[winner] += 1
+	end
+
+	local kill = duel.LastKill
+	sendState(duel, {
+		RoundWinner = winner,
+		Reason = reason,
+		Headshot = kill and kill.Headshot or false,
+		Distance = kill and kill.Distance or 0,
+	})
+
+	if winner and duel.Scores[winner] >= GameConfig.RoundsToWin then
+		task.wait(GameConfig.RoundEndTime * 0.6)
+		endDuel(duel, winner, "score")
+		return
+	end
+	task.wait(GameConfig.RoundEndTime)
+	spawnRound(duel)
+end
+
+local function returnToLobby(player: Player)
+	if not player.Parent then
+		return
+	end
+	CombatService.Disarm(player)
+	player:LoadCharacter()
+end
+
+endDuel = function(duel: Duel, winner: Player, reason: string)
+	if duel.Finished then
+		return
+	end
+	duel.Finished = true
+	duel.State = "Ended"
+	disconnectAll(duel)
+	clearHighlights(duel)
+	local loser = opponentOf(duel, winner)
+	local R = GameConfig.Rewards
+	local mult = if duel.Ranked then R.RankedMultiplier else 1
+
+	local perPlayer = {}
+	local wd, ld = DataService.Get(winner), DataService.Get(loser)
+
+	local eloW, eloL = 0, 0
+	if duel.Ranked and wd then
+		-- Si el perdedor abandonó, sus datos pueden haberse descargado ya
+		local loserElo = if ld then ld.Elo else (loser:GetAttribute("Elo") :: number? or GameConfig.StartingElo)
+		local loserPlayed = if ld then ld.RankedPlayed else GameConfig.PlacementMatches
+		local kW = if wd.RankedPlayed < GameConfig.PlacementMatches then GameConfig.EloKPlacement else GameConfig.EloK
+		local kL = if loserPlayed < GameConfig.PlacementMatches then GameConfig.EloKPlacement else GameConfig.EloK
+		eloW, eloL = Rank.EloDelta(wd.Elo, loserElo, 1, kW, kL)
+		eloW = math.max(eloW, 1)
+		wd.Elo += eloW
+		wd.RankedPlayed += 1
+		if ld then
+			ld.Elo = math.max(0, ld.Elo + eloL)
+			ld.RankedPlayed += 1
+		end
+	end
+
+	for _, p in duel.Players do
+		local d = DataService.Get(p)
+		local won = p == winner
+		local kills = duel.Kills[p] or 0
+		local base = (if won then R.WinCoins else R.LossCoins) + kills * R.KillCoins + (duel.Headshots[p] or 0) * R.HeadshotBonusCoins
+		local coins = math.floor(base * mult)
+		local xp = math.floor(((if won then R.WinXP else R.LossXP) + kills * R.KillXP) * mult)
+		if reason == "forfeit" and not won then
+			coins, xp = 0, 0
+		end
+		if d then
+			d.Coins += coins
+			if won then
+				d.Wins += 1
+				d.WinStreak += 1
+				d.BestStreak = math.max(d.BestStreak, d.WinStreak)
+				-- Bonus por racha: +10% de monedas por victoria seguida (máx. +50%)
+				local streakBonus = math.floor(coins * math.min(d.WinStreak - 1, 5) * 0.1)
+				d.Coins += streakBonus
+				coins += streakBonus
+			else
+				d.Losses += 1
+				d.WinStreak = 0
+			end
+			DataService.AddXP(p, xp)
+			DataService.Push(p)
+			if duel.Ranked then
+				LeaderboardService.Submit(p)
+			end
+		end
+		perPlayer[p] = {
+			Won = won,
+			Coins = coins,
+			XP = xp,
+			EloDelta = if duel.Ranked then (if won then eloW else eloL) else nil,
+			NewElo = d and d.Elo,
+			Streak = d and d.WinStreak,
+		}
+	end
+
+	sendState(duel, { Winner = winner, Reason = reason, PerPlayer = perPlayer })
+
+	for _, p in Players:GetPlayers() do
+		Net.Event("Notify"):FireClient(
+			p,
+			string.format("%s venció a %s (%d-%d)%s", winner.DisplayName, loser.DisplayName, duel.Scores[winner], duel.Scores[loser], if duel.Ranked then " · Ranked" else ""),
+			Color3.fromRGB(200, 200, 200)
+		)
+	end
+
+	task.wait(5)
+	for _, p in duel.Players do
+		duels[p] = nil
+		task.spawn(returnToLobby, p)
+	end
+	ArenaService.Release(duel.Arena)
+end
+
+function DuelService.IsBusy(player: Player): boolean
+	return duels[player] ~= nil
+end
+
+function DuelService.StartDuel(a: Player, b: Player, ranked: boolean): boolean
+	if a == b or duels[a] or duels[b] or not a.Parent or not b.Parent then
+		return false
+	end
+	local arena = ArenaService.Acquire()
+	if not arena then
+		return false
+	end
+	nextId += 1
+	local duel: Duel = {
+		Id = nextId,
+		Players = { a, b },
+		Arena = arena,
+		Scores = { [a] = 0, [b] = 0 },
+		Kills = { [a] = 0, [b] = 0 },
+		Headshots = { [a] = 0, [b] = 0 },
+		Round = 0,
+		State = "Intro",
+		Ranked = ranked,
+		RoundToken = 0,
+		RoundEndsAt = workspace:GetServerTimeNow() + GameConfig.IntroTime,
+		LastKill = nil,
+		Connections = {},
+		Finished = false,
+	}
+	duels[a] = duel
+	duels[b] = duel
+	sendState(duel)
+	task.delay(GameConfig.IntroTime, spawnRound, duel)
+	return true
+end
+
+function DuelService.Start()
+	CombatService.TargetResolver = function(player: Player): { Player }
+		local duel = duels[player]
+		if not duel or duel.State ~= "Live" then
+			return {}
+		end
+		return { opponentOf(duel, player) }
+	end
+
+	CombatService.Killed:Connect(function(killer: Player, victim: Player, info)
+		local duel = duels[killer]
+		if not duel or duels[victim] ~= duel or duel.State ~= "Live" then
+			return
+		end
+		duel.Kills[killer] += 1
+		duel.LastKill = { Killer = killer, Victim = victim, Headshot = info.Headshot, Distance = info.Distance, WeaponId = info.WeaponId }
+		if info.Headshot then
+			duel.Headshots[killer] += 1
+		end
+		for _, p in Players:GetPlayers() do
+			Net.Event("KillFeed"):FireClient(p, killer, victim, info.Headshot, info.Distance, info.WeaponId)
+		end
+		roundOver(duel, killer, "kill")
+	end)
+
+	Players.PlayerRemoving:Connect(function(player)
+		local duel = duels[player]
+		if duel then
+			duels[player] = nil
+			local other = opponentOf(duel, player)
+			if not duel.Finished then
+				task.spawn(endDuel, duel, other, "forfeit")
+			end
+		end
+	end)
+end
+
+return DuelService
