@@ -42,6 +42,7 @@ local FUNCTIONS = {
 	"Gift",
 	"AdminCommand",
 	"ClaimDaily",
+	"GetArmState",
 }
 
 local Net = {}

@@ -122,6 +122,7 @@ local function buildViewmodels()
 	equippedSkin = d and d.Equipped.Skin or "Default"
 	local ok1, err1 = pcall(function()
 		local vm = GunBuilder.Build(weapon.Id, equippedSkin)
+		GunBuilder.AddArms(vm, player.Character)
 		prepareModel(vm, "Viewmodel")
 		viewmodel = vm
 	end)
@@ -130,6 +131,7 @@ local function buildViewmodels()
 	end
 	local ok2, err2 = pcall(function()
 		local km = GunBuilder.BuildKnife(equippedSkin)
+		GunBuilder.AddKnifeArm(km, player.Character)
 		prepareModel(km, "KnifeViewmodel")
 		knifeModel = km
 	end)
@@ -751,6 +753,21 @@ function WeaponController.Start()
 	end)
 	-- Vía 3: sondeo en update() si nada de lo anterior llegó
 	task.defer(syncFromAttributes)
+	-- Vía 4: al empezar cada ronda, preguntar al servidor directamente
+	ClientState.DuelChanged:Connect(function(state)
+		if state and (state.State == "Countdown" or state.State == "Live") then
+			task.spawn(function()
+				local ok, res = pcall(function()
+					return Net.Function("GetArmState"):InvokeServer()
+				end)
+				if ok and type(res) == "table" and res.Armed and not ClientState.Armed then
+					applyArmState(res.WeaponId, res.Mag, res.Reloading, res.Slot)
+				elseif not ok then
+					warn("[SniperDuels] GetArmState:", res)
+				end
+			end)
+		end
+	end)
 
 	UserInputService.InputChanged:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseMovement then

@@ -253,4 +253,55 @@ function GunBuilder.BuildKnifeTool(skinId: string): Tool
 	return tool
 end
 
+-- Brazos en primera persona: color de piel del personaje si se puede leer
+local function skinColor(character: Model?): Color3
+	local arm = character and (character:FindFirstChild("RightHand") or character:FindFirstChild("Right Arm"))
+	if arm and arm:IsA("BasePart") then
+		return arm.Color
+	end
+	return Color3.fromRGB(204, 142, 105)
+end
+
+local function armPart(model: Model, name: string, size: Vector3, cf: CFrame, color: Color3)
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Size = size
+	p.CFrame = cf
+	p.Color = color
+	p.Material = Enum.Material.SmoothPlastic
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.Massless = true
+	p.CastShadow = false
+	p:SetAttribute("SkinKind", "Arm")
+	p.Parent = model
+	local weld = Instance.new("WeldConstraint")
+	weld.Part0 = model.PrimaryPart
+	weld.Part1 = p
+	weld.Parent = p
+end
+
+-- Rifle: mano derecha en la empuñadura, izquierda en el guardamanos
+function GunBuilder.AddArms(model: Model, character: Model?)
+	local color = skinColor(character)
+	local sleeve = Color3.fromRGB(40, 36, 44)
+	local base = (model.PrimaryPart :: BasePart).CFrame
+	-- Brazo derecho: viene desde abajo-derecha hasta la empuñadura
+	armPart(model, "ArmR", Vector3.new(0.5, 0.5, 1.6), base * CFrame.new(0.35, -0.75, 0.95) * CFrame.Angles(math.rad(35), math.rad(-15), 0), sleeve)
+	armPart(model, "HandR", Vector3.new(0.42, 0.42, 0.6), base * CFrame.new(0.05, -0.45, 0.3) * CFrame.Angles(math.rad(-20), 0, 0), color)
+	-- Brazo izquierdo: hacia delante, mano bajo el guardamanos
+	armPart(model, "ArmL", Vector3.new(0.5, 0.5, 1.9), base * CFrame.new(-0.55, -0.55, -0.6) * CFrame.Angles(math.rad(10), math.rad(25), 0), sleeve)
+	armPart(model, "HandL", Vector3.new(0.42, 0.42, 0.55), base * CFrame.new(-0.12, -0.28, -1.55) * CFrame.Angles(0, 0, math.rad(20)), color)
+end
+
+-- Cuchillo: mano derecha sujetando el mango
+function GunBuilder.AddKnifeArm(model: Model, character: Model?)
+	local color = skinColor(character)
+	local sleeve = Color3.fromRGB(40, 36, 44)
+	local base = (model.PrimaryPart :: BasePart).CFrame
+	armPart(model, "HandR", Vector3.new(0.45, 0.45, 0.7), base * CFrame.new(0, -0.05, 0.75), color)
+	armPart(model, "ArmR", Vector3.new(0.5, 0.5, 1.5), base * CFrame.new(0.15, -0.45, 1.6) * CFrame.Angles(math.rad(30), math.rad(-10), 0), sleeve)
+end
+
 return GunBuilder

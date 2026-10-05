@@ -182,6 +182,7 @@ local function buildBottom(parent: Instance)
 		refs.SlotFrames[i] = { Frame = f, Sub = sub }
 	end
 	refs.Slots = slots
+	refs.Status = Make.Label("", { Position = UDim2.fromOffset(16, 70), Size = UDim2.fromOffset(520, 16), TextXAlignment = Enum.TextXAlignment.Left, TextSize = 12, TextColor3 = Color3.fromRGB(180, 255, 200), TextStrokeTransparency = 0.5, Parent = parent })
 	refs.Hint = Make.Label("C agacharse · Shift+C deslizarse · Q cuchillo · M menú", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -8), Size = UDim2.fromOffset(600, 16), TextSize = 12, TextColor3 = T.SubText, Visible = false, Parent = parent })
 
 	local hp = new("Frame", { Name = "Health", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 30, 1, -36), Size = UDim2.fromOffset(260, 14), BackgroundColor3 = Color3.fromRGB(30, 30, 30), BackgroundTransparency = 0.2, Visible = false, Parent = parent }, { Make.Corner(7) })
@@ -469,6 +470,13 @@ local function update()
 
 	refs.Slots.Visible = armed
 	refs.Hint.Visible = armed
+	-- Línea de estado (diagnóstico): si algo falla, una captura de esto basta
+	if duel then
+		refs.Status.Text = string.format("estado: %s · armado: %s · arma: %s · ranura: %d · mira: %s · cámara: %s · menú: %s", tostring(duel.State), if armed then "sí" else "NO", tostring(ClientState.WeaponId ~= "" and ClientState.WeaponId or player:GetAttribute("SD_Weapon") or "-"), ClientState.Slot, tostring(ClientState.Scoped), tostring(player.CameraMode), tostring(ClientState.MenuOpen))
+		refs.Status.Visible = true
+	else
+		refs.Status.Visible = false
+	end
 	if armed then
 		local w = Weapons.Get(ClientState.WeaponId)
 		for i, sf in refs.SlotFrames do

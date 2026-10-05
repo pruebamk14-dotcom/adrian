@@ -187,6 +187,9 @@ local function spawnRound(duel: Duel)
 				local ok, err = pcall(spawnCombatant, duel, c, if i == 1 then duel.Arena.SpawnA else duel.Arena.SpawnB)
 				if not ok then
 					warn("[Duel] spawn:", err)
+					if isPlayer(c) then
+						Net.Event("Notify"):FireClient(c, "ERROR al preparar el arma: " .. tostring(err), Color3.fromRGB(255, 80, 80))
+					end
 				end
 			end
 			pending -= 1

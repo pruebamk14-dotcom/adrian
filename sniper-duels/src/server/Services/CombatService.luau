@@ -548,6 +548,14 @@ end
 function CombatService.Start()
 	Net.Event("Fire").OnServerEvent:Connect(onFire)
 	Net.Event("Reload").OnServerEvent:Connect(onReload)
+	-- Vía 4 de armado: el cliente pregunta su estado cuando empieza la ronda
+	Net.Function("GetArmState").OnServerInvoke = function(player)
+		local s = states[player]
+		if not s then
+			return { Armed = false }
+		end
+		return { Armed = true, WeaponId = s.WeaponId, Mag = s.Mag, Reloading = s.Reloading, Slot = s.Slot, CanFire = s.CanFire }
+	end
 	Net.Event("Melee").OnServerEvent:Connect(onMelee)
 	Net.Event("SetSlot").OnServerEvent:Connect(function(player, slot)
 		if type(slot) == "number" then
