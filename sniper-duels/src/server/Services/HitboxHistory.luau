@@ -69,6 +69,15 @@ function HitboxHistory.Clear(player: any)
 	end
 end
 
+-- Cajas en este mismo instante (sin rebobinar)
+function HitboxHistory.Current(player: any): { [string]: Box }
+	local char = player.Character
+	if char and char.Parent then
+		return capture(char)
+	end
+	return {}
+end
+
 -- Devuelve las cajas del jugador interpoladas en el tiempo t.
 function HitboxHistory.Sample(player: any, t: number): { [string]: Box }?
 	local list = history[player]

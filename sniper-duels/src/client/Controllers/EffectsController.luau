@@ -66,7 +66,7 @@ local function burst(at: CFrame, props: { [string]: any }, count: number, life: 
 	Debris:AddItem(holder, life or 3)
 end
 
-function EffectsController.PlaySound(name: string, volume: number?, at: Vector3?)
+function EffectsController.PlaySound(name: string, volume: number?, at: Vector3?, speed: number?)
 	local id = (GameConfig.Sounds :: any)[name]
 	if not id or id == "" then
 		return
@@ -74,6 +74,7 @@ function EffectsController.PlaySound(name: string, volume: number?, at: Vector3?
 	local s = Instance.new("Sound")
 	s.SoundId = id
 	s.Volume = volume or 0.6
+	s.PlaybackSpeed = speed or 1
 	if at then
 		local a = fxPart(CFrame.new(at))
 		s.RollOffMaxDistance = 1500

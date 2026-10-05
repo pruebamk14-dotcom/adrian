@@ -176,6 +176,8 @@ end
 local roundOver: (duel: Duel, winner: string?, reason: string) -> ()
 local endDuel: (duel: Duel, winner: string, reason: string) -> ()
 
+local duelKeyCounter = 0
+
 local function spawnCombatant(duel: Duel, c: Combatant, cf: CFrame)
 	if isPlayer(c) then
 		c:LoadCharacter()
@@ -187,6 +189,15 @@ local function spawnCombatant(duel: Duel, c: Combatant, cf: CFrame)
 		DuelService.BotHooks.Respawn(c, cf)
 	end
 	local char = c.Character
+	if char then
+		-- El cliente usa esto para la barra de vida del rival
+		-- "<duelo>:<equipo>" para no mezclar con otros duelos del servidor
+		if not (duel :: any).Key then
+			duelKeyCounter += 1
+			;(duel :: any).Key = tostring(duelKeyCounter)
+		end
+		char:SetAttribute("SD_Team", (duel :: any).Key .. ":" .. duel.TeamOf[c])
+	end
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	if hum then
 		hum.MaxHealth = GameConfig.MaxHealth

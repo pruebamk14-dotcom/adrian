@@ -51,6 +51,9 @@ type Bullet = {
 	Targets: { Combatant },
 	Params: RaycastParams,
 	Closest: number,
+	-- Impacto que vio el cliente (validado). Si el servidor no encuentra el
+	-- impacto por su cuenta (desfase de posiciones), se aplica este.
+	Claim: { Victim: Combatant, Zone: string, T: number, Dist: number }?,
 }
 
 local CombatService = {}
@@ -312,7 +315,7 @@ local function applyHit(bullet: Bullet, victim: Combatant, zone: string, positio
 
 	local studs = math.floor(distance)
 	if isPlayer(shooter) then
-		Net.Event("HitConfirm"):FireClient(shooter, zone, damage, killed, studs)
+		Net.Event("HitConfirm"):FireClient(shooter, zone, damage, killed, studs, position, humanoid.Health)
 	end
 	if isPlayer(victim) then
 		Net.Event("Damaged"):FireClient(victim, bullet.Origin, damage, humanoid.Health)
@@ -334,6 +337,30 @@ local function applyHit(bullet: Bullet, victim: Combatant, zone: string, positio
 	end
 end
 
+local function passThrough(inst: Instance): boolean
+	if inst:IsA("Terrain") then
+		return false
+	end
+	if inst:IsA("BasePart") then
+		return inst.Transparency >= 0.9 or not inst.CanCollide
+	end
+	return false
+end
+
+local function applyClaim(b: Bullet): boolean
+	local c = b.Claim
+	if not c then
+		return false
+	end
+	b.Claim = nil
+	local hitPos = Ballistics.PositionAt(b.Origin, b.Velocity, b.Gravity, c.T)
+	applyHit(b, c.Victim, c.Zone, hitPos)
+	if isPlayer(b.Shooter) then
+		Net.Event("ShotResult"):FireClient(b.Shooter, string.format("IMPACTO %s a %d studs", c.Zone, math.floor(c.Dist)))
+	end
+	return true
+end
+
 -- Avanza una bala hasta el tiempo de vuelo objetivo. Devuelve true si terminó.
 local function stepBullet(b: Bullet, targetT: number): boolean
 	local step = GameConfig.BallisticStep
@@ -347,14 +374,20 @@ local function stepBullet(b: Bullet, targetT: number): boolean
 		local len = delta.Magnitude
 
 		local worldHit = workspace:Raycast(from, delta, b.Params)
+		-- Piezas invisibles o sin colisión (adornos, zonas) no paran la bala
+		local guard = 0
+		while worldHit and guard < 6 and passThrough(worldHit.Instance) do
+			guard += 1
+			b.Params:AddToFilter(worldHit.Instance)
+			worldHit = workspace:Raycast(from, delta, b.Params)
+		end
 		local worldFrac = if worldHit then (worldHit.Position - from).Magnitude / math.max(len, 1e-6) else math.huge
 
 		-- Instante que el tirador veía para esta parte del vuelo
 		local sampleT = math.min(b.ShotTime + t1 - GameConfig.ViewInterpolationDelay, now)
 		local bestFrac, bestVictim, bestZone = math.huge, nil :: Combatant?, ""
 		for _, target in b.Targets do
-			local boxes = HitboxHistory.Sample(target, sampleT)
-			if boxes then
+			for _, boxes in { HitboxHistory.Sample(target, sampleT) or {}, HitboxHistory.Current(target) } do
 				for _, box in boxes do
 					local frac = Ballistics.SegmentOBB(from, to, box.CFrame, box.Size)
 					if frac and (frac < bestFrac - 1e-4 or (math.abs(frac - bestFrac) <= 1e-4 and box.Zone == "Head")) then
@@ -365,6 +398,7 @@ local function stepBullet(b: Bullet, targetT: number): boolean
 		end
 
 		if bestVictim and bestFrac <= worldFrac then
+			b.Claim = nil
 			applyHit(b, bestVictim, bestZone, from + delta * bestFrac)
 			if isPlayer(b.Shooter) then
 				Net.Event("ShotResult"):FireClient(b.Shooter, string.format("IMPACTO %s a %d studs", bestZone, math.floor((from + delta * bestFrac - b.Origin).Magnitude)))
@@ -382,12 +416,19 @@ local function stepBullet(b: Bullet, targetT: number): boolean
 			end
 		end
 		if worldHit then
+			-- El cliente vio el impacto antes de esta pared: vale el del cliente
+			if b.Claim and (worldHit.Position - b.Origin).Magnitude >= b.Claim.Dist - 3 then
+				return applyClaim(b)
+			end
 			if isPlayer(b.Shooter) then
 				Net.Event("ShotResult"):FireClient(b.Shooter, string.format("fallo: chocó con %s (pasó a %.1f studs del rival)", worldHit.Instance.Name, b.Closest))
 			end
 			return true
 		end
 		b.T = t1
+		if b.Claim and b.T >= b.Claim.T + 0.05 then
+			return applyClaim(b)
+		end
 		if b.T >= b.MaxT then
 			if isPlayer(b.Shooter) then
 				Net.Event("ShotResult"):FireClient(b.Shooter, string.format("fallo: pasó a %.1f studs del rival", b.Closest))
@@ -398,9 +439,63 @@ local function stepBullet(b: Bullet, targetT: number): boolean
 	return false
 end
 
-local function fireShot(player: Combatant, origin: any, direction: any, shotTime: any)
+local function reject(player: Combatant, why: string)
+	if isPlayer(player) then
+		Net.Event("ShotResult"):FireClient(player, "tiro rechazado: " .. why)
+	end
+end
+
+-- Comprueba el impacto que dice haber visto el cliente: el rival tiene que
+-- estar realmente cerca de la trayectoria (posición actual o rebobinada)
+local function validateClaim(bullet: Bullet, claim: any): { Victim: Combatant, Zone: string, T: number, Dist: number }?
+	if type(claim) ~= "table" or typeof(claim.Model) ~= "Instance" or type(claim.T) ~= "number" or claim.T ~= claim.T then
+		return nil
+	end
+	local t = claim.T
+	if t < 0 or t > bullet.MaxT then
+		return nil
+	end
+	local victim = nil
+	for _, target in bullet.Targets do
+		if target.Character == claim.Model then
+			victim = target
+		end
+	end
+	if not victim then
+		return nil
+	end
+	local hum = victim.Character:FindFirstChildOfClass("Humanoid")
+	if not hum or hum.Health <= 0 then
+		return nil
+	end
+	local point = Ballistics.PositionAt(bullet.Origin, bullet.Velocity, bullet.Gravity, t)
+	local dist = (point - bullet.Origin).Magnitude
+	local tolerance = 3.5 + dist * 0.012
+	local best, bestZone = math.huge, ""
+	local sampleT = bullet.ShotTime + t - GameConfig.ViewInterpolationDelay
+	for _, boxes in { HitboxHistory.Sample(victim, sampleT) or {}, HitboxHistory.Current(victim) } do
+		for name, box in boxes do
+			local local_ = box.CFrame:PointToObjectSpace(point)
+			local half = box.Size / 2
+			local outside = Vector3.new(math.max(math.abs(local_.X) - half.X, 0), math.max(math.abs(local_.Y) - half.Y, 0), math.max(math.abs(local_.Z) - half.Z, 0)).Magnitude
+			-- Preferir la parte que el cliente dice, si está igual de cerca
+			if outside < best - 0.05 or (math.abs(outside - best) <= 0.05 and name == claim.Part) then
+				best, bestZone = outside, box.Zone
+			end
+		end
+	end
+	if best > tolerance then
+		return nil
+	end
+	return { Victim = victim, Zone = bestZone, T = t, Dist = dist }
+end
+
+local function fireShot(player: Combatant, origin: any, direction: any, shotTime: any, claim: any?)
 	local s = states[player]
 	if not s or not s.CanFire or s.Reloading or s.Mag <= 0 then
+		if s and isPlayer(player) then
+			reject(player, if not s.CanFire then "la ronda no ha empezado" elseif s.Reloading then "recargando" else "sin balas")
+		end
 		return
 	end
 	if not isFiniteVector(origin) or not isFiniteVector(direction) or type(shotTime) ~= "number" or shotTime ~= shotTime then
@@ -412,6 +507,7 @@ local function fireShot(player: Combatant, origin: any, direction: any, shotTime
 	local w = Weapons.Get(s.WeaponId)
 	local clock = os.clock()
 	if clock - s.LastFire < w.FireCooldown * 0.85 then
+		reject(player, "cadencia")
 		return
 	end
 	local character = player.Character
@@ -421,6 +517,7 @@ local function fireShot(player: Combatant, origin: any, direction: any, shotTime
 		return
 	end
 	if (head.Position - origin).Magnitude > GameConfig.MaxOriginDistance then
+		reject(player, string.format("origen lejos de la cabeza (%.0f studs)", (head.Position - origin).Magnitude))
 		return
 	end
 
@@ -473,18 +570,22 @@ local function fireShot(player: Combatant, origin: any, direction: any, shotTime
 		Params = params,
 		Closest = math.huge,
 	}
+	if claim ~= nil then
+		bullet.Claim = validateClaim(bullet, claim)
+	end
 	-- Ponerse al día con el tiempo que la bala ya lleva volando (latencia)
 	if not stepBullet(bullet, serverNow - shotTime) then
 		table.insert(bullets, bullet)
 	end
 end
 
-local function onFire(player: Player, origin: any, direction: any, shotTime: any)
+local function onFire(player: Player, origin: any, direction: any, shotTime: any, claim: any)
 	local s = states[player]
 	if s and s.Slot ~= 1 then
+		reject(player, "tienes el cuchillo en la mano")
 		return
 	end
-	fireShot(player, origin, direction, shotTime)
+	fireShot(player, origin, direction, shotTime, claim)
 end
 
 -- Cuchillada: el servidor comprueba distancia y orientación contra las

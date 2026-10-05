@@ -15,7 +15,7 @@ local DuelService = require(script.Parent.DuelService)
 local DataService = require(script.Parent.DataService)
 local BotService = require(script.Parent.BotService)
 
-type QueueEntry = { Player: Player, Since: number }
+type QueueEntry = { Player: Player, Since: number, Ranked: boolean }
 
 local MatchmakingService = {}
 
@@ -36,9 +36,28 @@ local function leaveQueue(player: Player)
 	if i then
 		table.remove(queue, i)
 		if player.Parent then
-			Net.Event("QueueState"):FireClient(player, false, 0)
+			Net.Event("QueueState"):FireClient(player, false, 0, "")
 		end
 	end
+end
+
+local function modeOf(e: QueueEntry): string
+	return if e.Ranked then "Ranked" else "Casual"
+end
+
+local function startBotFor(player: Player, difficulty: string): boolean
+	if not BotService.IsReady() then
+		return false
+	end
+	local bot = BotService.Create(difficulty)
+	if not bot then
+		return false
+	end
+	if not DuelService.StartDuel(player, bot, false) then
+		BotService.Destroy(bot)
+		return false
+	end
+	return true
 end
 
 local function playerOnPad(pad: BasePart, taken: { [Player]: boolean }?): Player?
@@ -129,24 +148,52 @@ local function updateQueue()
 			table.remove(queue, i)
 		end
 	end
-	if #queue < 2 then
-		for _, e in queue do
-			Net.Event("QueueState"):FireClient(e.Player, true, math.floor(now - e.Since))
+	local matched: { [Player]: boolean } = {}
+
+	-- Partida rápida: emparejar a los que más llevan esperando
+	local casual = {}
+	for _, e in queue do
+		if not e.Ranked then
+			table.insert(casual, e)
 		end
-		return
+	end
+	table.sort(casual, function(x, y)
+		return x.Since < y.Since
+	end)
+	local i = 1
+	while i < #casual do
+		local x, y = casual[i], casual[i + 1]
+		if DuelService.StartDuel(x.Player, y.Player, false) then
+			matched[x.Player] = true
+			matched[y.Player] = true
+		end
+		i += 2
+	end
+	for _, e in casual do
+		if not matched[e.Player] and now - e.Since >= GameConfig.CasualBotFallback then
+			Net.Event("Notify"):FireClient(e.Player, "No hay nadie libre ahora mismo: ¡a calentar contra un bot!", Color3.fromRGB(255, 170, 60))
+			if startBotFor(e.Player, "Normal") then
+				matched[e.Player] = true
+			end
+		end
 	end
 
+	-- Ranked: por ELO, con ventana que crece con la espera
+	local ranked = {}
+	for _, e in queue do
+		if e.Ranked then
+			table.insert(ranked, e)
+		end
+	end
 	local function elo(p: Player): number
 		local d = DataService.Get(p)
 		return d and d.Elo or GameConfig.StartingElo
 	end
-	table.sort(queue, function(x, y)
+	table.sort(ranked, function(x, y)
 		return elo(x.Player) < elo(y.Player)
 	end)
-
-	local matched: { [Player]: boolean } = {}
-	for i = 1, #queue - 1 do
-		local x, y = queue[i], queue[i + 1]
+	for k = 1, #ranked - 1 do
+		local x, y = ranked[k], ranked[k + 1]
 		if not matched[x.Player] and not matched[y.Player] then
 			local waited = math.min(now - x.Since, now - y.Since)
 			local window = GameConfig.BaseEloWindow + GameConfig.EloWindowGrowthPerSecond * waited
@@ -158,13 +205,14 @@ local function updateQueue()
 			end
 		end
 	end
-	for i = #queue, 1, -1 do
-		local e = queue[i]
+
+	for k = #queue, 1, -1 do
+		local e = queue[k]
 		if matched[e.Player] then
-			table.remove(queue, i)
-			Net.Event("QueueState"):FireClient(e.Player, false, 0)
+			table.remove(queue, k)
+			Net.Event("QueueState"):FireClient(e.Player, false, 0, "")
 		else
-			Net.Event("QueueState"):FireClient(e.Player, true, math.floor(now - e.Since))
+			Net.Event("QueueState"):FireClient(e.Player, true, math.floor(now - e.Since), modeOf(e))
 		end
 	end
 end
@@ -174,8 +222,15 @@ function MatchmakingService.Start()
 		if DuelService.IsBusy(player) or queueIndex(player) or not DataService.Get(player) then
 			return
 		end
-		table.insert(queue, { Player = player, Since = os.clock() })
-		Net.Event("QueueState"):FireClient(player, true, 0)
+		table.insert(queue, { Player = player, Since = os.clock(), Ranked = true })
+		Net.Event("QueueState"):FireClient(player, true, 0, "Ranked")
+	end)
+	Net.Event("QueueCasual").OnServerEvent:Connect(function(player)
+		if DuelService.IsBusy(player) or queueIndex(player) or not DataService.Get(player) then
+			return
+		end
+		table.insert(queue, { Player = player, Since = os.clock(), Ranked = false })
+		Net.Event("QueueState"):FireClient(player, true, 0, "Casual")
 	end)
 	Net.Event("LeaveQueue").OnServerEvent:Connect(leaveQueue)
 

@@ -258,34 +258,74 @@ end
 
 -- Cuchillo mariposa: hoja + dos mangos que giran alrededor del pivote
 -- ("Pivot"). El cliente anima los mangos (Handle1/Handle2) en reposo.
+-- Cuchillo mariposa (balisong): hoja de punta de lanza con lomo, vaceo y
+-- filo pulido; dos mangos de canal con ventanas, pasadores y remates.
+-- Los mangos llevan el atributo Side/HandleSide para la animación de giro.
 function GunBuilder.BuildKnife(skinId: string): Model
 	local s = Skins.Get(skinId)
 	local model = Instance.new("Model")
 	model.Name = "Knife"
-	local pivot = part(model, "Pivot", Vector3.new(0.14, 0.14, 0.14), CFrame.new(0, 0, 0), "Metal", Enum.PartType.Ball)
+	local steel = Color3.fromRGB(196, 200, 210)
+	local dark = Color3.fromRGB(38, 40, 46)
+	local bladeColor = s.Accent:Lerp(steel, 0.45)
+	local glowEdge = s.Glow == true
+
+	local pivot = part(model, "Pivot", Vector3.new(0.12, 0.12, 0.12), CFrame.new(0, 0, 0), "Metal", Enum.PartType.Ball)
+	pivot.Color = dark
+	pivot.Material = Enum.Material.Metal
+
+	local function bladePart(name: string, size: Vector3, cf: CFrame, color: Color3, mat: Enum.Material, isWedge: boolean?)
+		local bp: BasePart = if isWedge then wedge(model, name, size, cf, "Blade") :: BasePart else part(model, name, size, cf, "Blade")
+		bp.Color = color
+		bp.Material = mat
+		bp.Reflectance = if mat == Enum.Material.Metal then 0.12 else 0
+		return bp
+	end
 	-- Hoja
-	local blade = part(model, "Blade", Vector3.new(0.05, 0.28, 1.25), CFrame.new(0, 0, -0.72), "Accent")
-	blade.Material = Enum.Material.Metal
-	blade.Color = s.Accent
-	local tip = wedge(model, "BladeTip", Vector3.new(0.05, 0.28, 0.35), CFrame.new(0, 0, -1.52) * CFrame.Angles(0, math.rad(180), 0), "Accent")
-	tip.Material = Enum.Material.Metal
-	tip.Color = s.Accent
-	local edge = part(model, "Edge", Vector3.new(0.02, 0.06, 1.2), CFrame.new(0, -0.14, -0.72), "Glass")
-	edge.Color = Color3.fromRGB(230, 235, 245)
-	edge.Material = Enum.Material.Neon
-	edge.Transparency = 0
-	-- Mangos (cada uno con su propio pivote para la animación)
+	bladePart("Blade", Vector3.new(0.045, 0.26, 1.05), CFrame.new(0, 0.01, -0.68), bladeColor, Enum.Material.Metal)
+	bladePart("Spine", Vector3.new(0.055, 0.035, 1.1), CFrame.new(0, 0.15, -0.66), bladeColor:Lerp(dark, 0.35), Enum.Material.Metal)
+	bladePart("Fuller", Vector3.new(0.05, 0.045, 0.7), CFrame.new(0, 0.06, -0.6), bladeColor:Lerp(dark, 0.55), Enum.Material.Metal)
+	local edge = bladePart("Edge", Vector3.new(0.025, 0.06, 1.0), CFrame.new(0, -0.13, -0.7), if glowEdge then s.Color else Color3.fromRGB(235, 238, 245), if glowEdge then Enum.Material.Neon else Enum.Material.Metal)
+	edge.Reflectance = 0.3
+	-- Punta de lanza: cuña superior + cuña inferior
+	bladePart("TipTop", Vector3.new(0.045, 0.17, 0.42), CFrame.new(0, 0.085, -1.41) * CFrame.Angles(0, math.rad(180), 0), bladeColor, Enum.Material.Metal, true)
+	bladePart("TipLow", Vector3.new(0.045, 0.14, 0.42), CFrame.new(0, -0.07, -1.41) * CFrame.Angles(0, math.rad(180), math.rad(180)), if glowEdge then s.Color else Color3.fromRGB(235, 238, 245), if glowEdge then Enum.Material.Neon else Enum.Material.Metal, true)
+	-- Recazo y pasadores del eje
+	bladePart("Ricasso", Vector3.new(0.05, 0.3, 0.2), CFrame.new(0, 0.01, -0.1), dark, Enum.Material.Metal)
+	bladePart("Kicker", Vector3.new(0.05, 0.1, 0.12), CFrame.new(0, -0.17, -0.06), dark, Enum.Material.Metal)
+
+	-- Mangos (Side = hacia dónde giran al abrirse)
 	for i, side in { -1, 1 } do
-		local h = part(model, "Handle" .. i, Vector3.new(0.1, 0.16, 1.15), CFrame.new(side * 0.08, 0, 0.6), "Body")
+		local x = side * 0.078
+		local h = part(model, "Handle" .. i, Vector3.new(0.075, 0.22, 1.3), CFrame.new(x, 0, 0.68), "Body")
 		h.Color = s.Color
 		h.Material = s.Material
 		h:SetAttribute("Side", side)
-		for k = 0, 3 do
-			local hole = part(model, "Hole" .. i .. k, Vector3.new(0.12, 0.07, 0.07), CFrame.new(side * 0.08, 0, 0.2 + k * 0.25), "Metal")
-			hole.Color = Color3.fromRGB(20, 20, 24)
-			hole:SetAttribute("HandleSide", side)
+		local function bit(name: string, size: Vector3, cf: CFrame, color: Color3, mat: Enum.Material, shape: Enum.PartType?)
+			local bp = part(model, name, size, cf, "Metal", shape)
+			bp.Color = color
+			bp.Material = mat
+			bp:SetAttribute("HandleSide", side)
+			return bp
 		end
+		-- Ventanas del canal
+		for k = 0, 3 do
+			bit("Hole" .. i .. k, Vector3.new(0.08, 0.075, 0.17), CFrame.new(x + side * 0.003, 0, 0.27 + k * 0.27), Color3.fromRGB(16, 16, 20), Enum.Material.SmoothPlastic)
+		end
+		-- Bandas de color de la skin a lo largo del mango
+		bit("Inlay" .. i .. "a", Vector3.new(0.08, 0.025, 1.05), CFrame.new(x + side * 0.002, 0.085, 0.7), s.Accent, if glowEdge then Enum.Material.Neon else s.Material)
+		bit("Inlay" .. i .. "b", Vector3.new(0.08, 0.025, 1.05), CFrame.new(x + side * 0.002, -0.085, 0.7), s.Accent, if glowEdge then Enum.Material.Neon else s.Material)
+		-- Pasador del eje y remate
+		bit("Pin" .. i, Vector3.new(0.09, 0.09, 0.09), CFrame.new(x, 0.06, 0.04), steel, Enum.Material.Metal, Enum.PartType.Ball)
+		bit("Pin" .. i .. "b", Vector3.new(0.09, 0.09, 0.09), CFrame.new(x, -0.06, 0.04), steel, Enum.Material.Metal, Enum.PartType.Ball)
+		bit("Cap" .. i, Vector3.new(0.085, 0.24, 0.09), CFrame.new(x, 0, 1.35), steel, Enum.Material.Metal)
 	end
+	-- Pestillo (en el mango 1)
+	local latch = part(model, "Latch", Vector3.new(0.03, 0.05, 0.32), CFrame.new(-0.078 - 0.05, 0, 1.2), "Metal")
+	latch.Color = steel
+	latch.Material = Enum.Material.Metal
+	latch:SetAttribute("HandleSide", -1)
+
 	model.PrimaryPart = pivot
 	for _, p in model:GetChildren() do
 		if p:IsA("BasePart") and p ~= pivot then
@@ -295,8 +335,7 @@ function GunBuilder.BuildKnife(skinId: string): Model
 			weld.Parent = p
 		end
 	end
-	local glow = s.Glow
-	if glow then
+	if s.Glow then
 		local light = Instance.new("PointLight")
 		light.Name = "SkinGlow"
 		light.Color = s.Color

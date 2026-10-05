@@ -140,6 +140,14 @@ local function buildDock()
 	local dock = new("Frame", { Name = "Dock", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -18), Size = UDim2.fromOffset(0, 56), AutomaticSize = Enum.AutomaticSize.X, BackgroundTransparency = 1, Parent = gui }, {
 		new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 10), SortOrder = Enum.SortOrder.LayoutOrder }),
 	})
+	refs.QuickBtn = Make.Button("▶ PARTIDA RÁPIDA", T.Accent, { Size = UDim2.fromOffset(210, 56), TextSize = 20, LayoutOrder = 0, Parent = dock }, function()
+		if ClientState.InQueue then
+			Net.Event("LeaveQueue"):FireServer()
+		else
+			Net.Event("QueueCasual"):FireServer()
+		end
+	end)
+	refs.QuickBtn.TextColor3 = T.Bg
 	refs.RankedBtn = Make.Button("⚔ RANKED", T.Danger, { Size = UDim2.fromOffset(170, 56), TextSize = 20, LayoutOrder = 1, Parent = dock }, function()
 		if ClientState.InQueue then
 			Net.Event("LeaveQueue"):FireServer()
@@ -173,7 +181,7 @@ local function buildDock()
 			end
 		end)
 	end
-	Make.Label("Súbete a un par de pads para un duelo casual · RANKED busca rival por ELO · VS BOT para jugar solo", {
+	Make.Label("PARTIDA RÁPIDA te empareja con quien esté libre (o con un bot si no hay nadie) · pads del lobby: 1v1 / 2v2 · RANKED por ELO · VS BOT para practicar", {
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.new(0.5, 0, 1, -80),
 		Size = UDim2.fromOffset(900, 18),
@@ -183,6 +191,18 @@ local function buildDock()
 		Parent = gui,
 	})
 	refs.Dock = dock
+	-- Encoger la barra si la pantalla es estrecha
+	local dockScale = new("UIScale", { Parent = dock })
+	local function fitDock()
+		local vw = workspace.CurrentCamera.ViewportSize.X
+		local natural = dock.AbsoluteSize.X / math.max(dockScale.Scale, 0.01)
+		dockScale.Scale = math.clamp((vw - 32) / math.max(natural, 1), 0.45, 1)
+	end
+	dock:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+		task.defer(fitDock)
+	end)
+	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(fitDock)
+	task.defer(fitDock)
 
 	-- Recompensa diaria
 	Make.Button("🎁", T.Gold, { Size = UDim2.fromOffset(56, 56), TextSize = 24, LayoutOrder = 0, Parent = dock }, function()
@@ -399,10 +419,14 @@ local function buildStats()
 	end
 end
 
-local function refreshQueue(inQueue: boolean, seconds: number)
+local function refreshQueue(inQueue: boolean, seconds: number, mode: string?)
 	ClientState.InQueue = inQueue
-	refs.RankedBtn.Text = if inQueue then string.format("BUSCANDO… %d:%02d", seconds // 60, seconds % 60) else "⚔ RANKED"
-	refs.RankedBtn.BackgroundColor3 = if inQueue then T.PanelLight else T.Danger
+	local searching = string.format("BUSCANDO… %d:%02d  ✕", seconds // 60, seconds % 60)
+	refs.RankedBtn.Text = if inQueue and mode == "Ranked" then searching else "⚔ RANKED"
+	refs.RankedBtn.BackgroundColor3 = if inQueue and mode == "Ranked" then T.PanelLight else T.Danger
+	refs.QuickBtn.Text = if inQueue and mode ~= "Ranked" then searching else "▶ PARTIDA RÁPIDA"
+	refs.QuickBtn.BackgroundColor3 = if inQueue and mode ~= "Ranked" then T.PanelLight else T.Accent
+	refs.QuickBtn.TextColor3 = if inQueue and mode ~= "Ranked" then T.Text else T.Bg
 end
 
 local function setVisible(visible: boolean)
@@ -455,6 +479,23 @@ function MenuController.Start()
 	end)
 	ClientState.DuelChanged:Connect(function(state)
 		setVisible(state.State == "Ended")
+	end)
+	-- Seguridad: en el lobby (sin arma) el ratón nunca debe quedarse clavado
+	-- en el centro; si pasa, los botones del menú no se pueden pulsar
+	local UserInputService = game:GetService("UserInputService")
+	game:GetService("RunService").RenderStepped:Connect(function()
+		if ClientState.Armed or not refs.Dock.Visible then
+			return
+		end
+		pcall(function()
+			if UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter then
+				UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+				UserInputService.MouseIconEnabled = true
+				if player.CameraMode == Enum.CameraMode.LockFirstPerson then
+					player.CameraMode = Enum.CameraMode.Classic
+				end
+			end
+		end)
 	end)
 
 	task.spawn(function()

@@ -14,7 +14,7 @@ Todo está escrito en **Luau** y se sincroniza con **Rojo**. No necesita assets 
 | Mira | Zoom simple | Zoom variable, **sway, aguantar la respiración** (Shift), quickscope con penalización de dispersión |
 | Contra-juego | — | **Destello de la mira**: ves un brillo cuando un rival te está apuntando |
 | Anti-camping | — | A los 35 s se revela la posición de los dos jugadores; si se acaba el tiempo, gana quien tenga más vida |
-| Matchmaking | Pads | Pads casuales + **cola ranked por ELO** con ventana que se amplía con la espera |
+| Matchmaking | Pads | **Partida rápida** (te empareja con quien esté libre; si en 25 s no hay nadie, contra un bot) + pads 1v1/2v2 + **cola ranked por ELO** con ventana que se amplía con la espera |
 | Progresión | — | Niveles, monedas, 4 rifles desbloqueables, 12 skins en 5 rarezas, rachas con bonus |
 | Mapas | Fijos | Arenas **simétricas** (justas para ambos lados) con 4 temas, entre ellos *Lost Hill* |
 | Persistencia | — | DataStore con session-lock, autoguardado, reintentos y ranking global |
@@ -31,6 +31,8 @@ Todo está escrito en **Luau** y se sincroniza con **Rojo**. No necesita assets 
 - La línea de estado del duelo muestra el resultado de cada disparo (impacto o por cuánto fallas).
 - Las skins y armas se pueden cambiar en mitad de un duelo; `:weapons me` y `:skins me` las equipan al momento.
 
+- **Impactos fiables**: el servidor simula la bala con rebobinado (lag compensation) y, además, el cliente le dice a quién vio darle; el servidor lo comprueba (el rival tiene que estar realmente junto a la trayectoria y sin pared en medio) y rechaza impactos inventados.
+- **Se nota cada tiro**: barra de vida del rival y la tuya en el marcador (con barra blanca que baja despacio), número de daño flotante, destello rojo sobre el rival, hitmarker con sonido y "le quedan X ❤"; al recibir daño, "-X" rojo, quejido y flecha de dirección.
 - **Cuchillo mariposa** en la ranura 2 (tecla 2 o Q): una cuchillada a corta distancia elimina; en reposo hace el giro de mariposa. Se corre más rápido con él.
 - **Agacharse y deslizarse** (C o Ctrl; corriendo con Shift + C te deslizas como en Call of Duty). Agachado dispersas menos.
 - **Menú con M** (y botón ☰): continuar, sensibilidad, mira por pulsación o alternar, abandonar el duelo.
@@ -57,7 +59,7 @@ El juego captura sus propios errores. Si aparece un aviso rojo **"⚠ N error(es
 
 ## Probar sin Roblox Studio: simulador
 
-`tools/sim/` contiene un simulador de Roblox sobre [Lune](https://github.com/lune-org/lune) que ejecuta el servidor y el cliente reales y juega un duelo completo (armado, mira, disparo con balística, cuchillo, recarga, menú, recompensa diaria, abandono, intercambio, regalo y duelo en pads), comprobando más de 80 puntos:
+`tools/sim/` contiene un simulador de Roblox sobre [Lune](https://github.com/lune-org/lune) que ejecuta el servidor y el cliente reales y juega un duelo completo (armado, mira, disparo con balística, cuchillo, recarga, menú, recompensa diaria, abandono, intercambio, regalo y duelo en pads), comprobando más de 110 puntos:
 
 ```bash
 rojo build -o build/sim.rbxl
@@ -139,7 +141,7 @@ sniper-duels/
 │   │       ├── HitboxHistory       # historial para la compensación de lag
 │   │       ├── CombatService       # disparo, balas, daño
 │   │       ├── DuelService         # rondas, recompensas, ELO
-│   │       ├── MatchmakingService  # pads + cola ranked
+│   │       ├── MatchmakingService  # pads + partida rápida + cola ranked
 │   │       ├── ShopService         # cajas, armas por monedas, equipar
 │   │       ├── LeaderboardService  # ranking global
 │   │       ├── BotService          # IA del modo solo

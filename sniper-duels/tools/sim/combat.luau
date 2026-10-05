@@ -46,7 +46,7 @@ M.GetSignal(M.Unwrap(remotes.DuelState), "OnClientEvent"):Connect(function(s)
 end)
 
 remotes.PlayBot:FireServer(difficulty)
-M.Run(8.5)
+M.Run(12.5)
 print("estado:", states[#states] and states[#states].State)
 
 local bot
@@ -95,7 +95,7 @@ if process.args[3] == "solo1" then
 	process.exit(0)
 end
 -- Fase 2: apuntar al bot (con la caída) y disparar 5 veces
-M.Run(6)
+M.Run(8.5)
 local last = states[#states]
 print("estado antes de disparar:", last and last.State, "ronda", last and last.Round)
 for _, m in workspace:GetChildren() do

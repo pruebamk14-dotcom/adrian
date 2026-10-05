@@ -23,6 +23,7 @@ local EVENTS = {
 	"Notify", -- S->C: texto, color?
 	"DataUpdate", -- S->C: datos públicos del jugador
 	"QueueRanked", -- C->S
+	"QueueCasual", -- C->S: partida rápida (cualquier rival, o bot si no hay)
 	"PlayBot", -- C->S: dificultad
 	"PromptPurchase", -- C->S: clave de producto / "VIP"
 	"Trade", -- C->S: acción, ...

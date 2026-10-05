@@ -40,6 +40,7 @@ local rng = Random.new()
 local weapon: Weapons.Weapon = Weapons.Get(Weapons.Default)
 local viewmodel: Model? = nil -- rifle
 local knifeModel: Model? = nil -- cuchillo
+local knifeRest: { [BasePart]: CFrame } = {} -- posición de reposo de los mangos
 local equippedSkin = "Default"
 
 local wantScope = false
@@ -134,6 +135,13 @@ local function buildViewmodels()
 		GunBuilder.AddKnifeArm(km, player.Character)
 		prepareModel(km, "KnifeViewmodel")
 		knifeModel = km
+		knifeRest = {}
+		local pv = km:GetPivot()
+		for _, part in km:GetChildren() do
+			if part:IsA("BasePart") and (part:GetAttribute("Side") or part:GetAttribute("HandleSide")) then
+				knifeRest[part] = pv:ToObjectSpace(part.CFrame)
+			end
+		end
 	end)
 	if not ok2 then
 		warn("[SniperDuels] viewmodel del cuchillo:", err2)
@@ -198,6 +206,57 @@ local function ejectShell()
 	end
 end
 
+-- Simula la bala en el mundo que ve este cliente. Si toca a un rival,
+-- el servidor lo usa (tras validarlo) cuando su propia simulación no
+-- encuentra el impacto por un desfase de posiciones.
+local function predictHit(origin: Vector3, direction: Vector3): { [string]: any }?
+	local char = player.Character
+	local params = RaycastParams.new()
+	params.FilterType = Enum.RaycastFilterType.Exclude
+	local exclude: { Instance } = { camera }
+	if char then
+		table.insert(exclude, char)
+	end
+	params.FilterDescendantsInstances = exclude
+	local velocity = direction.Unit * weapon.MuzzleVelocity
+	local maxT = 2500 / weapon.MuzzleVelocity
+	local step = 1 / 60
+	local t = 0
+	local last = origin
+	local guard = 0
+	while t < maxT and guard < 400 do
+		guard += 1
+		local nt = math.min(t + step, maxT)
+		local pos = Ballistics.PositionAt(origin, velocity, weapon.BulletGravity, nt)
+		local hit = workspace:Raycast(last, pos - last, params)
+		if hit then
+			local inst = hit.Instance
+			-- Subir hasta el modelo que tiene Humanoid (accesorios, armas...)
+			local model = inst:FindFirstAncestorOfClass("Model")
+			while model and not model:FindFirstChildOfClass("Humanoid") do
+				model = model:FindFirstAncestorOfClass("Model")
+			end
+			local hum = model and model:FindFirstChildOfClass("Humanoid")
+			if model and hum and model ~= char and hum.Health > 0 then
+				local frac = (hit.Position - last).Magnitude / math.max((pos - last).Magnitude, 1e-6)
+				local partName = inst.Name
+				if inst.Parent and inst.Parent:IsA("Accessory") then
+					partName = "Head"
+				end
+				return { Model = model, Part = partName, T = t + (nt - t) * frac }
+			end
+			if inst:IsA("BasePart") and (inst.Transparency >= 0.9 or not inst.CanCollide) then
+				params:AddToFilter(inst)
+				continue
+			end
+			return nil
+		end
+		last = pos
+		t = nt
+	end
+	return nil
+end
+
 local function fire()
 	if not ClientState.CanShoot() or ClientState.Reloading or ClientState.Slot ~= 1 or inputBlocked() then
 		return
@@ -235,7 +294,7 @@ local function fire()
 		aimDir = (CFrame.lookAt(Vector3.zero, aimDir) * CFrame.Angles(math.rad(sway.Y), math.rad(-sway.X), 0)).LookVector
 	end
 	local direction = Ballistics.ApplySpread(aimDir, spread, rng)
-	Net.Event("Fire"):FireServer(origin, direction, workspace:GetServerTimeNow())
+	Net.Event("Fire"):FireServer(origin, direction, workspace:GetServerTimeNow(), predictHit(origin, direction))
 
 	ClientState.Mag -= 1
 	ClientState.AmmoChanged:Fire()
@@ -410,10 +469,22 @@ end
 local function releaseCamera()
 	pcall(function()
 		player.CameraMode = Enum.CameraMode.Classic
+		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+		UserInputService.MouseIconEnabled = true
 	end)
+	-- Con el zoom en 0.5 Roblox sigue en primera persona y el ratón queda
+	-- clavado en el centro (no se podía pulsar nada al salir de la arena):
+	-- forzar la cámara hacia atrás y luego soltar el mínimo
 	pcall(function()
-		player.CameraMinZoomDistance = 0.5
 		player.CameraMaxZoomDistance = 20
+		player.CameraMinZoomDistance = 10
+	end)
+	task.delay(0.3, function()
+		if not ClientState.Armed then
+			pcall(function()
+				player.CameraMinZoomDistance = 0.5
+			end)
+		end
 	end)
 end
 
@@ -633,9 +704,10 @@ local function updateKnifeViewmodel(dt: number, hum: Humanoid?, planar: number)
 	for _, part in km:GetChildren() do
 		if part:IsA("BasePart") then
 			local side = part:GetAttribute("Side") or part:GetAttribute("HandleSide")
-			if side then
+			local rel = knifeRest[part]
+			if side and rel then
+				-- Siempre desde la posición de reposo (antes el giro se acumulaba)
 				local pivot = km:GetPivot()
-				local rel = pivot:ToObjectSpace(part.CFrame)
 				local hinge = CFrame.Angles(math.rad(180 * open * (side :: number)), 0, 0)
 				part.CFrame = pivot * hinge * rel
 			end

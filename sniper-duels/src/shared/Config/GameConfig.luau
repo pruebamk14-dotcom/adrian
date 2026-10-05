@@ -7,16 +7,19 @@ local GameConfig = {
 
 	-- Duelos
 	RoundsToWin = 3, -- Mejor de 5
-	IntroTime = 4,
-	CountdownTime = 3,
+	IntroTime = 5,
+	CountdownTime = 5,
 	RoundEndTime = 3.5,
-	RoundMaxTime = 75,
-	RevealAfter = 35, -- a los 35 s ambos jugadores quedan resaltados (anti-camping)
+	RoundMaxTime = 120,
+	RevealAfter = 60, -- a los 60 s ambos jugadores quedan resaltados (anti-camping)
 	MaxHealth = 100,
 
 	-- Lobby / pads
 	PadRadius = 4,
 	PadCountdown = 3,
+
+	-- Partida rápida: segundos esperando solo antes de jugar contra un bot
+	CasualBotFallback = 25,
 
 	-- Matchmaking ranked
 	BaseEloWindow = 100,
@@ -47,7 +50,7 @@ local GameConfig = {
 	MaxRewindTime = 0.45, -- segundos máximos de lag compensation
 	HistoryLength = 1.0,
 	MaxOriginDistance = 10, -- distancia máxima entre cabeza y origen del disparo
-	HitboxInflate = 1.22,
+	HitboxInflate = 1.3,
 	ViewInterpolationDelay = 0.06, -- retraso aprox. con el que el cliente ve a los demás
 	MaxBulletDistance = 2500,
 	BallisticStep = 1 / 120,
@@ -130,11 +133,13 @@ local GameConfig = {
 	-- librería pública de la Creator Store; cámbialos por los que quieras.
 	Sounds = {
 		Fire = "rbxassetid://9114726695",
-		Bolt = "",
+		Bolt = "rbxasset://sounds/clickfast.wav",
 		Reload = "rbxassetid://138084889",
 		Hitmarker = "rbxasset://sounds/electronicpingshort.wav",
-		Headshot = "",
-		ScopeIn = "",
+		Headshot = "rbxasset://sounds/electronicpingshort.wav",
+		Kill = "rbxasset://sounds/electronicpingshort.wav",
+		Hurt = "rbxasset://sounds/uuhhh.mp3",
+		ScopeIn = "rbxasset://sounds/clickfast.wav",
 		Countdown = "rbxasset://sounds/button.wav",
 		RoundWin = "",
 		RoundLose = "",

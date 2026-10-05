@@ -161,7 +161,7 @@ errorsBefore = #M.Errors
 remotes.PlayBot:FireServer("Practica") -- el bot de práctica no dispara: prueba determinista
 M.Run(1)
 check("DuelState Intro recibido", #duelStates > 0 and duelStates[1].State == "Intro", duelStates[1] and duelStates[1].State)
-M.Run(8.5) -- intro 4 + cuenta atrás 3
+M.Run(12.5) -- intro 5 + cuenta atrás 5
 local last = duelStates[#duelStates]
 check("ronda en Live", last and last.State == "Live", last and last.State)
 local bot = nil
@@ -319,6 +319,17 @@ M.FireAction("SD_Fire", Enum.UserInputState.End, Enum.UserInputType.MouseButton1
 M.Run(1.5)
 check("disparo enviado al servidor y procesado (munición baja)", p1:GetAttribute("SD_Mag") == 4, tostring(p1:GetAttribute("SD_Mag")))
 check("impacto confirmado en el bot", #hits > 0, if #hits > 0 then string.format("%s %d studs", hits[1][1], hits[1][4]) else ("sin HitConfirm; " .. tostring(ClientState.LastShot) .. "; scoped=" .. tostring(ClientState.Scoped) .. " sway=" .. tostring(ClientState.Sway)))
+do
+	local oppText = ""
+	local opp = pg.HUD:FindFirstChild("Score") and pg.HUD.Score:FindFirstChild("Opp")
+	for _, d in (opp and opp:GetDescendants() or {}) do
+		if d:IsA("TextLabel") and string.find(d.Text, "❤") then
+			oppText = d.Text
+		end
+	end
+	local n = tonumber(string.match(oppText, "%d+"))
+	check("barra de vida del rival baja con el impacto", n ~= nil and n < 100, oppText)
+end
 check("sin errores al disparar", #M.Errors == errorsBefore)
 -- Recargar
 -- Cuchillo (ranura 2), agacharse, menú y recompensa diaria
@@ -344,7 +355,7 @@ M.Run(0.3)
 check("viewmodel del cuchillo", workspace.CurrentCamera:FindFirstChild("KnifeViewmodel") ~= nil)
 M.Run(1.2) -- que gire la mariposa en reposo
 -- Rival nuevo (el anterior murió): esperar a la siguiente ronda Live
-M.Run(5)
+M.Run(7.5)
 last = duelStates[#duelStates]
 local bot2 = nil
 for _, m in workspace:GetChildren() do
@@ -430,9 +441,10 @@ do
 	M.FireAction("SD_InspectClose", Enum.UserInputState.Begin, Enum.UserInputType.Keyboard)
 	M.Run(0.2)
 	check("M cierra la inspección", insp ~= nil and insp.Visible == false)
-	InspectUI.Open("Knife", nil, "BlueCamo")
+	-- Comprobar justo al abrir: un cambio de ronda cierra la inspección (correcto)
+	local okK, errK = pcall(InspectUI.Open, "Knife", nil, "BlueCamo")
+	check("inspeccionar cuchillo", vp ~= nil and vp:FindFirstChild("Knife") ~= nil, tostring(okK) .. " " .. tostring(errK))
 	M.Run(0.2)
-	check("inspeccionar cuchillo", vp ~= nil and vp:FindFirstChild("Knife") ~= nil)
 	InspectUI.Close()
 end
 -- Recompensa diaria
@@ -506,10 +518,53 @@ end
 local before = #duelStates
 M.Run(4.5)
 check("duelo de pads iniciado", #duelStates > before and duelStates[#duelStates].OpponentName == "Amigo", duelStates[#duelStates] and duelStates[#duelStates].OpponentName)
-M.Run(8)
+M.Run(12)
 last = duelStates[#duelStates]
 check("duelo de pads en Live", last and last.State == "Live", last and last.State)
 check("ambos armados", p1b:GetAttribute("SD_Weapon") ~= "" and p2:GetAttribute("SD_Weapon") ~= "")
+-- Impacto visto por el cliente: el servidor lo valida (acepta un desfase
+-- pequeño de posiciones y rechaza un impacto inventado)
+do
+	check("personajes marcados con su equipo", p1b.Character:GetAttribute("SD_Team") ~= nil and p2.Character:GetAttribute("SD_Team") ~= nil and p1b.Character:GetAttribute("SD_Team") ~= p2.Character:GetAttribute("SD_Team"))
+	local claimHits = {}
+	local results = {}
+	M.GetSignal(M.Unwrap(remotes.HitConfirm), "OnClientEvent"):Connect(function(zone, dmg, killed, d, pos, left)
+		table.insert(claimHits, { zone, dmg, left, pos })
+	end)
+	M.GetSignal(M.Unwrap(remotes.ShotResult), "OnClientEvent"):Connect(function(text)
+		table.insert(results, text)
+	end)
+	-- Los dos en el aire, sin nada en medio
+	local sky = p1b.Character.HumanoidRootPart.Position + Vector3.new(0, 120, 0)
+	p1b.Character.HumanoidRootPart.Anchored = true
+	p2.Character.HumanoidRootPart.Anchored = true
+	p1b.Character:PivotTo(CFrame.new(sky))
+	p2.Character:PivotTo(CFrame.new(sky + Vector3.new(0, 0, -100)))
+	M.Run(0.4)
+	local head = p1b.Character.Head
+	local torso = p2.Character:FindFirstChild("UpperTorso") or p2.Character:FindFirstChild("Torso")
+	local hum2 = p2.Character:FindFirstChildOfClass("Humanoid")
+	local Weapons = M.Require.server(game:GetService("ReplicatedStorage").Shared.Config.Weapons)
+	local w = Weapons.Get(p1b:GetAttribute("SD_Weapon"))
+	local function aimAt(target: Vector3)
+		local d = (target - head.Position).Magnitude
+		local t = d / w.MuzzleVelocity
+		return (target + Vector3.new(0, 0.5 * w.BulletGravity * t * t, 0) - head.Position).Unit, t
+	end
+	-- 1) Impacto inventado: disparo al cielo diciendo que dio en la cabeza
+	remotes.Fire:FireServer(head.Position, Vector3.new(0, 1, 0), workspace:GetServerTimeNow(), { Model = p2.Character, Part = "Head", T = 0.05 })
+	M.Run(1.6)
+	check("impacto inventado rechazado", #claimHits == 0 and hum2.Health == 100, string.format("impactos=%d vida=%d", #claimHits, hum2.Health))
+	-- 2) Desfase: el servidor ve al rival 2,4 studs a un lado (la caja no
+	-- toca), el cliente lo vio en la trayectoria -> se acepta
+	local dir, t = aimAt(torso.Position + Vector3.new(2.4, 0, 0))
+	remotes.Fire:FireServer(head.Position, dir, workspace:GetServerTimeNow(), { Model = p2.Character, Part = "UpperTorso", T = t })
+	M.Run(1.6)
+	check("impacto del cliente validado con desfase pequeño", #claimHits == 1 and hum2.Health < 100, string.format("impactos=%d vida=%d · %s", #claimHits, hum2.Health, results[#results] or "-"))
+	check("HitConfirm trae posición y vida restante", claimHits[1] ~= nil and typeof(claimHits[1][4]) == "Vector3" and claimHits[1][3] == hum2.Health)
+	p1b.Character.HumanoidRootPart.Anchored = false
+	p2.Character.HumanoidRootPart.Anchored = false
+end
 -- p2 abandona: p1 gana por abandono
 M.RemovePlayer(p2)
 M.Run(1.5)
@@ -540,7 +595,7 @@ last = duelStates[#duelStates]
 check("duelo 2v2 iniciado", #duelStates > before2 and last and last.Mode == "2v2", last and tostring(last.Mode))
 check("compañero en el equipo", last and last.AllyNames == "Compi", last and tostring(last.AllyNames))
 check("dos rivales", last and last.OpponentName == "Rival1 & Rival2", last and tostring(last.OpponentName))
-M.Run(8)
+M.Run(12)
 last = duelStates[#duelStates]
 check("2v2 en Live con todos armados", last and last.State == "Live" and p3:GetAttribute("SD_Weapon") ~= "" and p5:GetAttribute("SD_Weapon") ~= "", last and last.State)
 -- Un rival se va: el duelo sigue 2v1
@@ -568,6 +623,34 @@ end
 M.Run(1)
 check("subirse al pad abre el menú de bot", menuGui:FindFirstChild("Bot") ~= nil and menuGui.Bot.Visible == true)
 check("sin errores en el pad de bot", #M.Errors == errorsBefore)
+
+-- PARTIDA RÁPIDA ----------------------------------------------------------------------------
+section("Partida rápida")
+errorsBefore = #M.Errors
+if menuGui:FindFirstChild("Bot") then
+	menuGui.Bot.Visible = false
+end
+local p6 = M.Wrap(M.AddPlayer("Rapido", 6))
+M.Run(1.5)
+local beforeQ = #duelStates
+remotes.QueueCasual:FireServer()
+M.GetSignal(M.Unwrap(remotes.QueueCasual), "OnServerEvent"):Fire(p6)
+M.Run(2.5)
+local q = duelStates[#duelStates]
+check("partida rápida empareja a dos jugadores", #duelStates > beforeQ and q and q.OpponentName == "Rapido" and not q.VsBot, q and tostring(q.OpponentName))
+remotes.LeaveDuel:FireServer()
+M.Run(7)
+check("fuera del duelo tras abandonar", p1b:GetAttribute("SD_Weapon") == "", tostring(p1b:GetAttribute("SD_Weapon")))
+-- Solo en la cola: a los CasualBotFallback segundos, contra un bot
+M.Require.server(game:GetService("ReplicatedStorage").Shared.Config.GameConfig).CasualBotFallback = 2
+local beforeB = #duelStates
+remotes.QueueCasual:FireServer()
+M.Run(4.5)
+local qb = duelStates[#duelStates]
+check("sin rival: partida contra el bot", #duelStates > beforeB and qb and qb.VsBot == true, qb and tostring(qb.OpponentName))
+remotes.LeaveDuel:FireServer()
+M.Run(2)
+check("sin errores en partida rápida", #M.Errors == errorsBefore)
 
 end
 local okMain, errMain = xpcall(main, M.Traceback)
