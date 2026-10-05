@@ -1,0 +1,265 @@
+--!strict
+-- Definición de armas. Velocidades en studs/s, gravedad en studs/s^2.
+
+export type Weapon = {
+	Id: string,
+	DisplayName: string,
+	Description: string,
+	UnlockLevel: number,
+	Damage: { Head: number, Torso: number, Limb: number },
+	FalloffStart: number, -- distancia a partir de la cual el daño al cuerpo baja
+	FalloffMinMultiplier: number,
+	MuzzleVelocity: number,
+	BulletGravity: number,
+	FireCooldown: number,
+	MagSize: number,
+	ReserveAmmo: number,
+	ReloadTime: number,
+	ScopeInTime: number,
+	ZoomFOV: { number },
+	HipSpread: number, -- grados
+	ScopedSpread: number,
+	MoveSpreadAdd: number,
+	AirSpreadAdd: number,
+	Sway: number,
+	RecoilPitch: number,
+	ScopedWalkMultiplier: number,
+	BarrelLength: number,
+	-- Tienda (opcional). Las armas por nivel no se pueden intercambiar.
+	CoinPrice: number?, -- se compra con monedas
+	RobuxProduct: string?, -- clave en GameConfig.Monetization.Products
+	Exclusive: boolean?, -- exclusiva (Robux / evento)
+	Tradeable: boolean?,
+	Tagline: string?,
+}
+
+local Weapons: { [string]: Weapon } = {
+	Intervention = {
+		Id = "Intervention",
+		DisplayName = "Intervention",
+		Description = "Cerrojo clásico. Un disparo al torso mata.",
+		UnlockLevel = 1,
+		Damage = { Head = 250, Torso = 100, Limb = 65 },
+		FalloffStart = 1e9,
+		FalloffMinMultiplier = 1,
+		MuzzleVelocity = 1400,
+		BulletGravity = 45,
+		FireCooldown = 1.3,
+		MagSize = 5,
+		ReserveAmmo = 999,
+		ReloadTime = 2.6,
+		ScopeInTime = 0.2,
+		ZoomFOV = { 22, 9 },
+		HipSpread = 4.5,
+		ScopedSpread = 0,
+		MoveSpreadAdd = 1.2,
+		AirSpreadAdd = 6,
+		Sway = 0.35,
+		RecoilPitch = 6,
+		ScopedWalkMultiplier = 0.55,
+		BarrelLength = 3.2,
+	},
+	Viper = {
+		Id = "Viper",
+		DisplayName = "Viper SR",
+		Description = "Ligero y rápido de apuntar. Ideal para quickscope.",
+		UnlockLevel = 5,
+		Damage = { Head = 200, Torso = 100, Limb = 55 },
+		FalloffStart = 350,
+		FalloffMinMultiplier = 0.85,
+		MuzzleVelocity = 1150,
+		BulletGravity = 60,
+		FireCooldown = 1.05,
+		MagSize = 4,
+		ReserveAmmo = 999,
+		ReloadTime = 2.1,
+		ScopeInTime = 0.12,
+		ZoomFOV = { 30, 15 },
+		HipSpread = 4.5,
+		ScopedSpread = 0,
+		MoveSpreadAdd = 0.6,
+		AirSpreadAdd = 3.5,
+		Sway = 0.25,
+		RecoilPitch = 5,
+		ScopedWalkMultiplier = 0.7,
+		BarrelLength = 2.6,
+	},
+	Tempest = {
+		Id = "Tempest",
+		DisplayName = "Tempest DMR",
+		Description = "Semiautomático. Dos disparos al torso, uno a la cabeza.",
+		UnlockLevel = 10,
+		Damage = { Head = 150, Torso = 55, Limb = 40 },
+		FalloffStart = 1e9,
+		FalloffMinMultiplier = 1,
+		MuzzleVelocity = 1250,
+		BulletGravity = 50,
+		FireCooldown = 0.32,
+		MagSize = 10,
+		ReserveAmmo = 999,
+		ReloadTime = 2.4,
+		ScopeInTime = 0.18,
+		ZoomFOV = { 35 },
+		HipSpread = 5,
+		ScopedSpread = 0.15,
+		MoveSpreadAdd = 0.8,
+		AirSpreadAdd = 4,
+		Sway = 0.2,
+		RecoilPitch = 2.5,
+		ScopedWalkMultiplier = 0.65,
+		BarrelLength = 2.9,
+	},
+	Leviathan = {
+		Id = "Leviathan",
+		DisplayName = "Leviathan .50",
+		Description = "Anti-material. Bala casi recta, cerrojo lento.",
+		UnlockLevel = 20,
+		Damage = { Head = 300, Torso = 120, Limb = 100 },
+		FalloffStart = 1e9,
+		FalloffMinMultiplier = 1,
+		MuzzleVelocity = 2200,
+		BulletGravity = 25,
+		FireCooldown = 1.9,
+		MagSize = 3,
+		ReserveAmmo = 999,
+		ReloadTime = 3.2,
+		ScopeInTime = 0.3,
+		ZoomFOV = { 18, 7 },
+		HipSpread = 10,
+		ScopedSpread = 0,
+		MoveSpreadAdd = 2,
+		AirSpreadAdd = 8,
+		Sway = 0.5,
+		RecoilPitch = 9,
+		ScopedWalkMultiplier = 0.45,
+		BarrelLength = 3.8,
+	},
+}
+
+-- Armas de tienda: mismas reglas de daño (un disparo al torso / cabeza)
+-- para que NO sea pay-to-win: cambian sensaciones, no la ventaja.
+Weapons.Valkyrie = {
+	Id = "Valkyrie",
+	DisplayName = "Valkyrie M24",
+	Description = "Equilibrio perfecto entre velocidad de mira y balística.",
+	UnlockLevel = 1,
+	Damage = { Head = 250, Torso = 100, Limb = 60 },
+	FalloffStart = 1e9,
+	FalloffMinMultiplier = 1,
+	MuzzleVelocity = 1500,
+	BulletGravity = 42,
+	FireCooldown = 1.25,
+	MagSize = 5,
+	ReserveAmmo = 999,
+	ReloadTime = 2.4,
+	ScopeInTime = 0.17,
+	ZoomFOV = { 24, 10 },
+	HipSpread = 6,
+	ScopedSpread = 0,
+	MoveSpreadAdd = 1,
+	AirSpreadAdd = 5.5,
+	Sway = 0.3,
+	RecoilPitch = 5.5,
+	ScopedWalkMultiplier = 0.6,
+	BarrelLength = 3.4,
+	CoinPrice = 6000,
+	Tradeable = true,
+	Tagline = "LA FAVORITA DE LOS PROS",
+}
+Weapons.Reaper = {
+	Id = "Reaper",
+	DisplayName = "The Reaper",
+	Description = "Exclusiva de Halloween. Trazadores espectrales y sonido de guadaña.",
+	UnlockLevel = 1,
+	Damage = { Head = 250, Torso = 100, Limb = 65 },
+	FalloffStart = 1e9,
+	FalloffMinMultiplier = 1,
+	MuzzleVelocity = 1450,
+	BulletGravity = 44,
+	FireCooldown = 1.25,
+	MagSize = 5,
+	ReserveAmmo = 999,
+	ReloadTime = 2.5,
+	ScopeInTime = 0.18,
+	ZoomFOV = { 22, 9 },
+	HipSpread = 6.5,
+	ScopedSpread = 0,
+	MoveSpreadAdd = 1.1,
+	AirSpreadAdd = 6,
+	Sway = 0.32,
+	RecoilPitch = 6,
+	ScopedWalkMultiplier = 0.55,
+	BarrelLength = 3.6,
+	RobuxProduct = "WeaponReaper",
+	Exclusive = true,
+	Tradeable = true,
+	Tagline = "EDICIÓN LIMITADA HALLOWEEN",
+}
+Weapons.Obsidian = {
+	Id = "Obsidian",
+	DisplayName = "Obsidian X",
+	Description = "Rifle de élite con cargador ampliado y recarga rápida.",
+	UnlockLevel = 1,
+	Damage = { Head = 250, Torso = 100, Limb = 60 },
+	FalloffStart = 1e9,
+	FalloffMinMultiplier = 1,
+	MuzzleVelocity = 1350,
+	BulletGravity = 48,
+	FireCooldown = 1.3,
+	MagSize = 6,
+	ReserveAmmo = 999,
+	ReloadTime = 2.1,
+	ScopeInTime = 0.19,
+	ZoomFOV = { 22, 9 },
+	HipSpread = 7,
+	ScopedSpread = 0,
+	MoveSpreadAdd = 1.2,
+	AirSpreadAdd = 6,
+	Sway = 0.33,
+	RecoilPitch = 6,
+	ScopedWalkMultiplier = 0.55,
+	BarrelLength = 3.3,
+	RobuxProduct = "WeaponObsidian",
+	Exclusive = true,
+	Tradeable = true,
+	Tagline = "SOLO PARA LEYENDAS",
+}
+
+-- Cuchillo (ranura 2): una cuchillada a corta distancia elimina
+local Melee = {
+	Id = "Knife",
+	DisplayName = "Cuchillo mariposa",
+	Range = 8,
+	Cooldown = 0.55,
+	Damage = 100,
+	WalkMultiplier = 1.1, -- se corre más con el cuchillo
+}
+
+local Order = { "Intervention", "Viper", "Tempest", "Leviathan", "Valkyrie", "Reaper", "Obsidian" }
+
+-- ¿Se obtiene por nivel (gratis) o hay que comprarla?
+local function isShopWeapon(w: Weapon): boolean
+	return w.CoinPrice ~= nil or w.RobuxProduct ~= nil
+end
+
+return {
+	List = Weapons,
+	Order = Order,
+	Default = "Intervention",
+	IsShopWeapon = isShopWeapon,
+	Melee = Melee,
+	-- Un jugador tiene el arma si la desbloqueó por nivel o la tiene en el inventario
+	Owns = function(data: any, id: string): boolean
+		local w = Weapons[id]
+		if not w or not data then
+			return false
+		end
+		if isShopWeapon(w) then
+			return data.Inventory.Weapons ~= nil and data.Inventory.Weapons[id] == true
+		end
+		return data.Level >= w.UnlockLevel
+	end,
+	Get = function(id: string): Weapon
+		return Weapons[id] or Weapons.Intervention
+	end,
+}
