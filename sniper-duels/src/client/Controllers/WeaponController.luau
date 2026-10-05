@@ -53,6 +53,12 @@ local mouseDelta = Vector2.zero
 -- aplicamos solo la diferencia respecto al offset del frame anterior.
 local appliedPitch, appliedYaw = 0, 0
 
+-- Desenfoque breve durante la transición a la mira
+local scopeBlur = Instance.new("BlurEffect")
+scopeBlur.Name = "SD_ScopeBlur"
+scopeBlur.Size = 0
+scopeBlur.Parent = camera
+
 local function settings()
 	local d = ClientState.Data
 	return d and d.Settings or { Sensitivity = 1, ScopeSensitivity = 0.55, ToggleScope = false }
@@ -159,12 +165,19 @@ local function fire()
 		end
 	end
 	if not ClientState.Scoped then
-		EffectsController.MuzzleFlash(muzzlePos, Color3.fromRGB(255, 200, 100))
+		EffectsController.MuzzleFlash(muzzlePos, direction, Color3.fromRGB(255, 200, 100))
 	end
+	EffectsController.Shake(if ClientState.Scoped then 0.5 else 0.9)
 	EffectsController.Tracer(origin, direction, weapon.Id, equippedSkin, if ClientState.Scoped then origin + camCf.UpVector * -0.3 else muzzlePos)
 	EffectsController.PlaySound("Fire", 0.9)
 
 	recoilVel += weapon.RecoilPitch * 18
+	if weapon.FireCooldown < 0.8 and viewmodel then
+		local ej = viewmodel:FindFirstChild("Ejection", true) :: Attachment?
+		if ej then
+			EffectsController.EjectShell(ej.WorldCFrame)
+		end
+	end
 	if WeaponController.OnFired then
 		WeaponController.OnFired(spread)
 	end
@@ -176,6 +189,13 @@ local function fire()
 			if os.clock() - lastFire < weapon.FireCooldown then
 				wantScope = false
 				EffectsController.PlaySound("Bolt", 0.6)
+			end
+		end)
+		task.delay(weapon.FireCooldown * 0.45, function()
+			local vm = viewmodel
+			local ej = vm and vm:FindFirstChild("Ejection", true) :: Attachment?
+			if ej then
+				EffectsController.EjectShell(ej.WorldCFrame)
 			end
 		end)
 		task.delay(weapon.FireCooldown, function()
@@ -204,6 +224,7 @@ local function onArmedChanged()
 		setScoped(false)
 		ClientState.ScopeProgress = 0
 		camera.FieldOfView = BASE_FOV
+		scopeBlur.Size = 0
 		recoil, recoilVel = 0, 0
 		appliedPitch, appliedYaw = 0, 0
 		player.CameraMode = Enum.CameraMode.Classic
@@ -304,6 +325,7 @@ local function update(dt: number)
 	local eased = 1 - (1 - p) ^ 3
 	local fov = BASE_FOV + (zoomFov - BASE_FOV) * eased
 	camera.FieldOfView = fov
+	scopeBlur.Size = math.sin(math.clamp(p, 0, 1) * math.pi) * 10
 
 	-- Sensibilidad
 	local s = settings()

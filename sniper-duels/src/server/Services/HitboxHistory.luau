@@ -14,7 +14,8 @@ type Snapshot = { T: number, Boxes: { [string]: Box } }
 
 local HitboxHistory = {}
 
-local history: { [Player]: { Snapshot } } = {}
+-- Clave: Player o bot (cualquier tabla con campo Character)
+local history: { [any]: { Snapshot } } = {}
 
 local ZONES: { [string]: string } = {
 	Head = "Head",
@@ -54,22 +55,22 @@ local function capture(character: Model): { [string]: Box }
 	return boxes
 end
 
-function HitboxHistory.Track(player: Player)
+function HitboxHistory.Track(player: any)
 	history[player] = {}
 end
 
-function HitboxHistory.Untrack(player: Player)
+function HitboxHistory.Untrack(player: any)
 	history[player] = nil
 end
 
-function HitboxHistory.Clear(player: Player)
+function HitboxHistory.Clear(player: any)
 	if history[player] then
 		history[player] = {}
 	end
 end
 
 -- Devuelve las cajas del jugador interpoladas en el tiempo t.
-function HitboxHistory.Sample(player: Player, t: number): { [string]: Box }?
+function HitboxHistory.Sample(player: any, t: number): { [string]: Box }?
 	local list = history[player]
 	if not list or #list == 0 then
 		return nil

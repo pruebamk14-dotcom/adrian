@@ -31,6 +31,7 @@ local function template()
 	return {
 		Version = 1,
 		Coins = 250,
+		Candies = 0,
 		XP = 0,
 		Level = 1,
 		Elo = GameConfig.StartingElo,
@@ -45,7 +46,9 @@ local function template()
 		LongestShot = 0,
 		WinStreak = 0,
 		BestStreak = 0,
-		Inventory = { Skins = { Default = true } },
+		Inventory = { Skins = { Default = true }, Weapons = {} },
+		ProcessedReceipts = {}, -- ids de compras ya entregadas (idempotencia)
+		TradesCompleted = 0,
 		Equipped = { Weapon = "Intervention", Skin = "Default" },
 		Settings = { Sensitivity = 1, ScopeSensitivity = 0.55, ToggleScope = false },
 	}
@@ -140,15 +143,23 @@ local function saveRaw(player: Player, data: any, release: boolean)
 				return nil -- otra sesión tomó el control, no sobrescribir
 			end
 			local copy = table.clone(data)
+			copy._VIP = nil
 			copy.SessionLock = if release then nil else { JobId = jobId, Time = os.time() }
 			return copy
 		end)
 	end)
 end
 
+-- VIP lo marca MonetizationService con un flag de sesión (no se guarda: se
+-- comprueba el pase cada vez que entras)
+local function player_isVIP(data: any): boolean
+	return data._VIP == true
+end
+
 local function publicData(data: any)
 	return {
 		Coins = data.Coins,
+		Candies = data.Candies,
 		XP = data.XP,
 		Level = data.Level,
 		XPNext = Rank.XPForLevel(data.Level),
@@ -165,6 +176,7 @@ local function publicData(data: any)
 		BestStreak = data.BestStreak,
 		Inventory = data.Inventory,
 		Equipped = data.Equipped,
+		VIP = player_isVIP(data),
 		Settings = data.Settings,
 	}
 end
@@ -218,15 +230,27 @@ function DataService.AddXP(player: Player, amount: number): number
 	end
 	data.XP += amount
 	local gained = 0
+	local coins = 0
 	while data.XP >= Rank.XPForLevel(data.Level) do
 		data.XP -= Rank.XPForLevel(data.Level)
 		data.Level += 1
 		gained += 1
+		-- Cada nivel da monedas (más cuanto más alto)
+		coins += GameConfig.LevelUpCoinsBase + data.Level * GameConfig.LevelUpCoinsPerLevel
 	end
 	if gained > 0 then
-		Net.Event("Notify"):FireClient(player, "¡Nivel " .. data.Level .. "!", Color3.fromRGB(255, 215, 64))
+		data.Coins += coins
+		Net.Event("Notify"):FireClient(player, string.format("¡Nivel %d!  +%d monedas", data.Level, coins), Color3.fromRGB(255, 215, 64))
 	end
 	return gained
+end
+
+-- Guardado inmediato (compras con Robux e intercambios)
+function DataService.SaveNow(player: Player)
+	local data = profiles[player]
+	if data then
+		saveRaw(player, data, false)
+	end
 end
 
 function DataService.Public(player: Player)

@@ -25,6 +25,12 @@ local camera = workspace.CurrentCamera
 
 local HUDController = {}
 
+-- Desaturar la pantalla con poca vida
+local lowHp = Instance.new("ColorCorrectionEffect")
+lowHp.Name = "SD_LowHealth"
+lowHp.Enabled = false
+lowHp.Parent = game:GetService("Lighting")
+
 local gui: ScreenGui
 local refs: { [string]: any } = {}
 
@@ -202,7 +208,7 @@ end
 
 local function buildBanner(parent: Instance)
 	local banner = new("Frame", { Name = "Banner", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.36), Size = UDim2.fromOffset(800, 140), BackgroundTransparency = 1, Parent = parent })
-	refs.BannerTitle = Make.Label("", { Size = UDim2.new(1, 0, 0, 80), Font = T.FontBlack, TextSize = 64, TextTransparency = 1, TextStrokeTransparency = 1, Parent = banner })
+	refs.BannerTitle = Make.Label("", { Size = UDim2.new(1, 0, 0, 80), Font = T.FontTitle, TextSize = 72, TextTransparency = 1, TextStrokeTransparency = 1, Parent = banner })
 	refs.BannerSub = Make.Label("", { Position = UDim2.fromOffset(0, 80), Size = UDim2.new(1, 0, 0, 30), TextColor3 = T.SubText, TextSize = 22, TextTransparency = 1, Parent = banner })
 	refs.Banner = banner
 
@@ -230,21 +236,22 @@ local function buildOverlay(parent: Instance)
 	refs.VSOpp = Make.Label("", { AnchorPoint = Vector2.new(0, 0.5), Position = UDim2.new(0.5, 90, 0.45, 0), Size = UDim2.fromOffset(500, 60), TextXAlignment = Enum.TextXAlignment.Left, Font = T.FontBlack, TextSize = 46, TextColor3 = T.Danger, ZIndex = 21, Parent = vs })
 	refs.VSMeSub = Make.Label("", { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(0.5, -90, 0.45, 32), Size = UDim2.fromOffset(500, 26), TextXAlignment = Enum.TextXAlignment.Right, TextColor3 = T.SubText, ZIndex = 21, Parent = vs })
 	refs.VSOppSub = Make.Label("", { AnchorPoint = Vector2.new(0, 0), Position = UDim2.new(0.5, 90, 0.45, 32), Size = UDim2.fromOffset(500, 26), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = T.SubText, ZIndex = 21, Parent = vs })
-	Make.Label("VS", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.45), Size = UDim2.fromOffset(160, 100), Font = T.FontBlack, TextSize = 80, TextColor3 = T.Gold, ZIndex = 21, Parent = vs })
+	Make.Label("VS", { AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.45), Size = UDim2.fromOffset(160, 100), Font = T.FontTitle, TextSize = 80, TextColor3 = T.Gold, ZIndex = 21, Parent = vs })
 	refs.VSArena = Make.Label("", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromScale(0.5, 0.6), Size = UDim2.fromOffset(600, 30), TextColor3 = T.SubText, TextSize = 20, ZIndex = 21, Parent = vs })
 	refs.VS = vs
 
 	-- Resumen final
-	local sum = new("Frame", { Name = "Summary", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(420, 300), BackgroundColor3 = T.Panel, Visible = false, ZIndex = 30, Parent = parent }, {
+	local sum = new("Frame", { Name = "Summary", AnchorPoint = Vector2.new(0.5, 0.5), Position = UDim2.fromScale(0.5, 0.5), Size = UDim2.fromOffset(420, 330), BackgroundColor3 = T.Panel, Visible = false, ZIndex = 30, Parent = parent }, {
 		Make.Corner(16),
 		Make.Stroke(T.Stroke, 2),
 		Make.Padding(20),
 		new("UIListLayout", { Padding = UDim.new(0, 8), HorizontalAlignment = Enum.HorizontalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder }),
 	})
-	refs.SumTitle = Make.Label("VICTORIA", { Size = UDim2.new(1, 0, 0, 56), Font = T.FontBlack, TextSize = 50, ZIndex = 31, LayoutOrder = 1, Parent = sum })
+	refs.SumTitle = Make.Label("VICTORIA", { Size = UDim2.new(1, 0, 0, 56), Font = T.FontTitle, TextSize = 50, ZIndex = 31, LayoutOrder = 1, Parent = sum })
 	refs.SumScore = Make.Label("", { Size = UDim2.new(1, 0, 0, 26), TextColor3 = T.SubText, ZIndex = 31, LayoutOrder = 2, Parent = sum })
 	refs.SumCoins = Make.Label("", { Size = UDim2.new(1, 0, 0, 28), TextColor3 = T.Gold, TextSize = 22, ZIndex = 31, LayoutOrder = 3, Parent = sum })
 	refs.SumXP = Make.Label("", { Size = UDim2.new(1, 0, 0, 28), TextColor3 = T.Blue, TextSize = 22, ZIndex = 31, LayoutOrder = 4, Parent = sum })
+	refs.SumCandy = Make.Label("", { Size = UDim2.new(1, 0, 0, 26), TextColor3 = T.Candy, TextSize = 20, ZIndex = 31, LayoutOrder = 4, Parent = sum })
 	refs.SumElo = Make.Label("", { Size = UDim2.new(1, 0, 0, 28), TextSize = 22, ZIndex = 31, LayoutOrder = 5, Parent = sum })
 	refs.SumStreak = Make.Label("", { Size = UDim2.new(1, 0, 0, 24), TextColor3 = Color3.fromRGB(255, 140, 60), ZIndex = 31, LayoutOrder = 6, Parent = sum })
 	refs.Summary = sum
@@ -284,23 +291,21 @@ function HUDController.Toast(text: string, color: Color3?)
 end
 
 local feedOrder = 0
-local function addKillFeed(killer: Player, victim: Player, headshot: boolean, distance: number, weaponId: string)
-	if killer ~= player and victim ~= player and not (ClientState.Duel and (ClientState.Duel.Opponent == killer or ClientState.Duel.Opponent == victim)) then
-		-- Solo kills globales destacados: tiros largos o headshots
-		if not headshot and distance < 300 then
-			return
-		end
+local function addKillFeed(info: any)
+	local headshot, distance = info.Headshot, info.Distance
+	local involved = info.Involved
+	if not involved and not headshot and distance < 300 then
+		return -- de otros duelos solo se muestran headshots y tiros largos
 	end
 	feedOrder -= 1
-	local involved = killer == player or victim == player
 	local row = new("Frame", { Size = UDim2.fromOffset(0, 30), AutomaticSize = Enum.AutomaticSize.X, BackgroundColor3 = if involved then Color3.fromRGB(40, 40, 30) else T.Panel, BackgroundTransparency = 0.2, LayoutOrder = feedOrder, Parent = refs.Feed }, {
 		Make.Corner(6),
 		Make.Padding(6),
 		new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 8), VerticalAlignment = Enum.VerticalAlignment.Center }),
 	})
-	Make.Label(killer.DisplayName, { Size = UDim2.fromOffset(0, 18), AutomaticSize = Enum.AutomaticSize.X, TextSize = 15, TextColor3 = if killer == player then T.Accent else T.Text, Parent = row })
-	Make.Label(string.format("[%s%s · %dst]", Weapons.Get(weaponId).DisplayName, if headshot then " ✦" else "", distance), { Size = UDim2.fromOffset(0, 18), AutomaticSize = Enum.AutomaticSize.X, TextSize = 13, TextColor3 = if headshot then T.Gold else T.SubText, Parent = row })
-	Make.Label(victim.DisplayName, { Size = UDim2.fromOffset(0, 18), AutomaticSize = Enum.AutomaticSize.X, TextSize = 15, TextColor3 = if victim == player then T.Danger else T.Text, Parent = row })
+	Make.Label(info.KillerName, { Size = UDim2.fromOffset(0, 18), AutomaticSize = Enum.AutomaticSize.X, TextSize = 15, TextColor3 = if info.KillerIsMe then T.Accent else T.Text, Parent = row })
+	Make.Label(string.format("[%s%s · %dst]", Weapons.Get(info.WeaponId).DisplayName, if headshot then " ✦" else "", distance), { Size = UDim2.fromOffset(0, 18), AutomaticSize = Enum.AutomaticSize.X, TextSize = 13, TextColor3 = if headshot then T.Gold else T.SubText, Parent = row })
+	Make.Label(info.VictimName, { Size = UDim2.fromOffset(0, 18), AutomaticSize = Enum.AutomaticSize.X, TextSize = 15, TextColor3 = if info.VictimIsMe then T.Danger else T.Text, Parent = row })
 	task.delay(6, function()
 		row:Destroy()
 	end)
@@ -324,18 +329,19 @@ local function showSummary(state: any)
 	refs.SumScore.Text = string.format("%d - %d contra %s%s", state.MyScore, state.OppScore, state.OpponentName, if state.Reason == "forfeit" then " (abandono)" else "")
 	refs.SumCoins.Text = string.format("+%d monedas", state.Coins or 0)
 	refs.SumXP.Text = string.format("+%d XP", state.XP or 0)
+	refs.SumCandy.Text = if T.Halloween then string.format("+%d caramelos", state.Candies or 0) else ""
 	if state.Ranked and state.EloDelta then
 		local tier = Rank.FromElo(state.NewElo or 0)
 		refs.SumElo.Text = string.format("ELO %s%d  →  %d  (%s)", if state.EloDelta >= 0 then "+" else "", state.EloDelta, state.NewElo or 0, tier.Name)
 		refs.SumElo.TextColor3 = if state.EloDelta >= 0 then T.Accent else T.Danger
 	else
-		refs.SumElo.Text = "Duelo casual"
+		refs.SumElo.Text = if state.VsBot then "Modo solo (recompensas x0.5)" else "Duelo casual"
 		refs.SumElo.TextColor3 = T.SubText
 	end
 	refs.SumStreak.Text = if won and (state.Streak or 0) >= 2 then string.format("🔥 Racha de %d victorias", state.Streak) else ""
 	refs.Summary.Visible = true
-	refs.Summary.Size = UDim2.fromOffset(380, 260)
-	tween(refs.Summary, 0.35, { Size = UDim2.fromOffset(420, 300) }, Enum.EasingStyle.Back)
+	refs.Summary.Size = UDim2.fromOffset(380, 290)
+	tween(refs.Summary, 0.35, { Size = UDim2.fromOffset(420, 330) }, Enum.EasingStyle.Back)
 	task.delay(5, function()
 		refs.Summary.Visible = false
 	end)
@@ -358,8 +364,8 @@ local function onDuelState(state: any)
 		refs.VSMe.Text = player.DisplayName
 		refs.VSOpp.Text = state.OpponentName
 		refs.VSMeSub.Text = string.format("%s · %d", Rank.FromElo(myElo).Name, myElo)
-		refs.VSOppSub.Text = string.format("%s · %d", Rank.FromElo(state.OpponentElo or 1000).Name, state.OpponentElo or 1000)
-		refs.VSArena.Text = string.format("%s  ·  Mapa: %s  ·  Primero a %d", if state.Ranked then "RANKED" else "CASUAL", state.Arena, state.RoundsToWin)
+		refs.VSOppSub.Text = if state.OpponentIsBot then "BOT · IA" else string.format("%s · %d", Rank.FromElo(state.OpponentElo or 1000).Name, state.OpponentElo or 1000)
+		refs.VSArena.Text = string.format("%s  ·  Mapa: %s  ·  Primero a %d", if state.Ranked then "RANKED" elseif state.VsBot then "MODO SOLO" else "CASUAL", state.Arena, state.RoundsToWin)
 		refs.VS.Visible = true
 		refs.VS.BackgroundTransparency = 1
 		tween(refs.VS, 0.4, { BackgroundTransparency = 0.25 })
@@ -379,8 +385,8 @@ local function onDuelState(state: any)
 	elseif state.State == "Live" and lastState == "Countdown" then
 		HUDController.Banner("¡YA!", nil, T.Accent, 0.6)
 	elseif state.State == "RoundEnd" then
-		local won = state.RoundWinner == player
-		if state.RoundWinner == nil then
+		local won = state.RoundWon == true
+		if state.IsDraw then
 			HUDController.Banner("EMPATE", "Nadie suma punto", T.SubText, 2.5)
 		else
 			local sub = if state.Reason == "kill"
@@ -427,6 +433,7 @@ local function onHitConfirm(zone: string, damage: number, killed: boolean, dista
 end
 
 local function onDamaged(fromPos: Vector3, _damage: number, _health: number)
+	EffectsController.Shake(1.4)
 	refs.DamageFlash.BackgroundTransparency = 0.35
 	tween(refs.DamageFlash, 0.8, { BackgroundTransparency = 1 })
 	local cf = camera.CFrame
@@ -469,7 +476,13 @@ local function update()
 			refs.HealthFill.Size = UDim2.fromScale(frac, 1)
 			refs.HealthFill.BackgroundColor3 = if frac > 0.5 then T.Accent elseif frac > 0.25 then T.Gold else T.Danger
 			refs.HealthText.Text = tostring(math.ceil(hum.Health))
+			local low = math.clamp(1 - frac / 0.4, 0, 1)
+			lowHp.Enabled = low > 0 and hum.Health > 0
+			lowHp.Saturation = -0.7 * low
+			lowHp.TintColor = Color3.new(1, 1 - 0.25 * low, 1 - 0.25 * low)
 		end
+	else
+		lowHp.Enabled = false
 	end
 
 	if duel then

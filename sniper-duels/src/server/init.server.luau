@@ -16,6 +16,9 @@ local DuelService = require(Services.DuelService)
 local MatchmakingService = require(Services.MatchmakingService)
 local ShopService = require(Services.ShopService)
 local LeaderboardService = require(Services.LeaderboardService)
+local BotService = require(Services.BotService)
+local MonetizationService = require(Services.MonetizationService)
+local TradeService = require(Services.TradeService)
 
 Players.CharacterAutoLoads = false
 Players.RespawnTime = 2
@@ -24,9 +27,12 @@ ArenaService.Start()
 HitboxHistory.Start()
 CombatService.Start()
 DuelService.Start()
+BotService.Start()
 MatchmakingService.Start()
 ShopService.Start()
 LeaderboardService.Start()
+MonetizationService.Start()
+TradeService.Start()
 DataService.Start()
 
 -- Personajes del lobby: reaparecer al morir si no está en un duelo

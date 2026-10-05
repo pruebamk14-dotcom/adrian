@@ -15,6 +15,9 @@ local Net = require(Shared.Net)
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Make = require(script.Parent.Parent.UI.Make)
+local ShopUI = require(script.Parent.Parent.UI.ShopUI)
+local TradeUI = require(script.Parent.Parent.UI.TradeUI)
+local HUDController = require(script.Parent.HUDController)
 
 local T = Make.Theme
 local new = Make.new
@@ -50,7 +53,7 @@ local function makePanel(name: string, title: string): Frame
 		Make.Stroke(T.Stroke, 2),
 		new("UISizeConstraint", { MinSize = Vector2.new(360, 320), MaxSize = Vector2.new(900, 620) }),
 	})
-	Make.Label(title, { Position = UDim2.fromOffset(24, 16), Size = UDim2.new(1, -80, 0, 34), TextXAlignment = Enum.TextXAlignment.Left, Font = T.FontBlack, TextSize = 28, Parent = panel })
+	Make.Label(title, { Position = UDim2.fromOffset(24, 14), Size = UDim2.new(1, -80, 0, 38), TextXAlignment = Enum.TextXAlignment.Left, Font = T.FontTitle, TextSize = 34, TextColor3 = if T.Halloween then T.Accent else T.Text, Parent = panel })
 	Make.Button("✕", T.PanelLight, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 0, 14), Size = UDim2.fromOffset(38, 38), Parent = panel }, function()
 		MenuController.Close()
 	end)
@@ -121,7 +124,7 @@ local function refreshProfile()
 	local tier = Rank.FromElo(d.Elo)
 	refs.Rank.Text = string.format("%s · %d ELO%s", tier.Name, d.Elo, if d.RankedPlayed < GameConfig.PlacementMatches then string.format(" (clasificación %d/%d)", d.RankedPlayed, GameConfig.PlacementMatches) else "")
 	refs.Rank.TextColor3 = tier.Color
-	refs.Coins.Text = string.format("● %d monedas", d.Coins)
+	refs.Coins.Text = if T.Halloween then string.format("● %d monedas    🍬 %d", d.Coins, d.Candies or 0) else string.format("● %d monedas", d.Coins)
 	refs.Level.Text = string.format("NIVEL %d   ·   %d / %d XP", d.Level, d.XP, d.XPNext)
 	refs.XPFill.Size = UDim2.fromScale(math.clamp(d.XP / math.max(d.XPNext, 1), 0, 1), 1)
 end
@@ -139,8 +142,25 @@ local function buildDock()
 			Net.Event("QueueRanked"):FireServer()
 		end
 	end)
-	for i, info in { { "ARSENAL", "Arsenal" }, { "TIENDA", "Shop" }, { "RANKING", "Leaderboard" }, { "PERFIL", "Stats" } } do
-		Make.Button(info[1], T.PanelLight, { Size = UDim2.fromOffset(130, 56), LayoutOrder = i + 1, Parent = dock }, function()
+	for i, info in {
+		{ if T.Halloween then "🎃 VS BOT" else "VS BOT", "Bot" },
+		{ "🛒 TIENDA", "Shop" },
+		{ "ARSENAL", "Arsenal" },
+		{ "🔄 TRADE", "Trade" },
+		{ "RANKING", "Leaderboard" },
+		{ "PERFIL", "Stats" },
+	} do
+		local color = if i == 1 then T.Purple elseif i == 2 then T.Gold else T.PanelLight
+		local b = Make.Button(info[1], color, { Size = UDim2.fromOffset(124, 56), LayoutOrder = i + 1, Parent = dock }, function()
+			if info[2] == "Shop" then
+				MenuController.Close()
+				ShopUI.Open()
+				return
+			elseif info[2] == "Trade" then
+				MenuController.Close()
+				TradeUI.OpenList()
+				return
+			end
 			if openPanel == info[2] then
 				MenuController.Close()
 			else
@@ -148,10 +168,10 @@ local function buildDock()
 			end
 		end)
 	end
-	Make.Label("Súbete a un par de pads para un duelo casual · RANKED busca rival por ELO", {
+	Make.Label("Súbete a un par de pads para un duelo casual · RANKED busca rival por ELO · VS BOT para jugar solo", {
 		AnchorPoint = Vector2.new(0.5, 1),
 		Position = UDim2.new(0.5, 0, 1, -80),
-		Size = UDim2.fromOffset(700, 18),
+		Size = UDim2.fromOffset(900, 18),
 		TextSize = 14,
 		TextColor3 = T.SubText,
 		TextStrokeTransparency = 0.7,
@@ -186,7 +206,8 @@ local function buildArsenal()
 		for i, id in Weapons.Order do
 			local w = Weapons.List[id]
 			local equipped = d.Equipped.Weapon == id
-			local locked = d.Level < w.UnlockLevel
+			local locked = not Weapons.Owns(d, id)
+			local inShop = Weapons.IsShopWeapon(w)
 			local c = card(body, 84, i, if equipped then T.Accent else nil)
 			Make.Label(w.DisplayName, { Position = UDim2.fromOffset(14, 10), Size = UDim2.new(1, -180, 0, 22), TextXAlignment = Enum.TextXAlignment.Left, Font = T.FontBlack, TextSize = 20, Parent = c })
 			Make.Label(w.Description, { Position = UDim2.fromOffset(14, 34), Size = UDim2.new(1, -180, 0, 18), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = T.SubText, TextSize = 14, TextTruncate = Enum.TextTruncate.AtEnd, Parent = c })
@@ -194,12 +215,15 @@ local function buildArsenal()
 				string.format("Cabeza %d · Torso %d · Cadencia %.2fs · Cargador %d · Velocidad %d", w.Damage.Head, w.Damage.Torso, w.FireCooldown, w.MagSize, w.MuzzleVelocity),
 				{ Position = UDim2.fromOffset(14, 56), Size = UDim2.new(1, -180, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = T.SubText, TextSize = 12, TextTruncate = Enum.TextTruncate.AtEnd, Parent = c }
 			)
-			local label = if equipped then "EQUIPADA" elseif locked then ("NIVEL " .. w.UnlockLevel) else "EQUIPAR"
-			local btn = Make.Button(label, if equipped then T.Accent elseif locked then T.PanelLight else T.Blue, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0), Size = UDim2.fromOffset(140, 40), TextSize = 15, Parent = c })
-			btn.Active = not locked and not equipped
+			local label = if equipped then "EQUIPADA" elseif locked and inShop then "🛒 EN TIENDA" elseif locked then ("NIVEL " .. w.UnlockLevel) else "EQUIPAR"
+			local btn = Make.Button(label, if equipped then T.Accent elseif locked and inShop then T.Gold elseif locked then T.PanelLight else T.Blue, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0), Size = UDim2.fromOffset(140, 40), TextSize = 15, Parent = c })
+			btn.Active = not equipped
 			btn.MouseButton1Click:Connect(function()
 				if not locked and not equipped then
 					Net.Function("EquipWeapon"):InvokeServer(id)
+				elseif locked and inShop then
+					MenuController.Close()
+					ShopUI.Open("Weapons")
 				end
 			end)
 		end
@@ -235,66 +259,28 @@ local function buildArsenal()
 	end
 end
 
--- Tienda ---------------------------------------------------------------------
+-- Modo solo (VS BOT) -------------------------------------------------------
 
-local function buildShop()
-	local body = makePanel("Shop", "TIENDA")
-	local rolling = false
-
-	local reel = new("Frame", { Size = UDim2.new(1, 0, 0, 140), BackgroundColor3 = T.Panel, ClipsDescendants = true, Parent = body }, { Make.Corner(12), Make.Stroke(T.Stroke, 1.5) })
-	local strip = new("Frame", { Size = UDim2.fromOffset(0, 120), Position = UDim2.fromOffset(0, 10), BackgroundTransparency = 1, Parent = reel })
-	new("Frame", { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.fromScale(0.5, 0), Size = UDim2.new(0, 3, 1, 0), BackgroundColor3 = T.Gold, BorderSizePixel = 0, ZIndex = 5, Parent = reel })
-
-	local result = Make.Label("Caja de skins · " .. GameConfig.CratePrice .. " monedas", { Position = UDim2.fromOffset(0, 154), Size = UDim2.new(1, 0, 0, 30), TextSize = 20, Parent = body })
-	local odds = {}
-	for _, r in Skins.Rarities do
-		table.insert(odds, string.format("%s %.1f%%", r.Name, r.Weight))
+local function buildBotPanel()
+	local body = makePanel("Bot", if T.Halloween then "DUELO CONTRA LA CALABAZA" else "DUELO CONTRA BOT")
+	new("UIListLayout", { Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder, Parent = body })
+	Make.Label("Practica tú solo. El bot usa las mismas armas, balística y reglas que un jugador.", { TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = T.SubText, TextSize = 14, TextWrapped = true, Size = UDim2.new(1, 0, 0, 36), LayoutOrder = 0, Parent = body })
+	local options = {
+		{ "Practica", "PRÁCTICA", "No dispara. Solo se mueve: ideal para probar armas y la caída de la bala.", T.Blue },
+		{ "Facil", "FÁCIL", "Reacciona lento y falla bastante.", Color3.fromRGB(90, 200, 110) },
+		{ "Normal", "NORMAL", "Un rival decente. Te ve, apunta y dispara con cabeza.", T.Gold },
+		{ "Dificil", "DIFÍCIL", "Rápido y preciso. Adelanta tus movimientos. Usa Viper.", T.Accent },
+		{ "Pesadilla", "PESADILLA", "Reflejos de élite. Busca la cabeza. Solo para valientes.", T.Danger },
+	}
+	for i, o in options do
+		local row = card(body, 74, i, o[4])
+		Make.Label(o[2], { Position = UDim2.fromOffset(16, 10), Size = UDim2.new(1, -200, 0, 28), TextXAlignment = Enum.TextXAlignment.Left, Font = T.FontTitle, TextSize = 26, TextColor3 = o[4], Parent = row })
+		Make.Label(o[3], { Position = UDim2.fromOffset(16, 40), Size = UDim2.new(1, -200, 0, 20), TextXAlignment = Enum.TextXAlignment.Left, TextColor3 = T.SubText, TextSize = 13, TextTruncate = Enum.TextTruncate.AtEnd, Parent = row })
+		Make.Button("JUGAR", o[4], { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0), Size = UDim2.fromOffset(140, 44), TextColor3 = T.Bg, Parent = row }, function()
+			Net.Event("PlayBot"):FireServer(o[1])
+			MenuController.Close()
+		end)
 	end
-	Make.Label(table.concat(odds, "  ·  "), { Position = UDim2.fromOffset(0, 186), Size = UDim2.new(1, 0, 0, 18), TextSize = 13, TextColor3 = T.SubText, Parent = body })
-	Make.Label(string.format("Los duplicados devuelven el %d%% del precio.", GameConfig.DuplicateRefund * 100), { Position = UDim2.fromOffset(0, 206), Size = UDim2.new(1, 0, 0, 18), TextSize = 13, TextColor3 = T.SubText, Parent = body })
-
-	local CELL = 130
-	local function cellFor(s: Skins.Skin, x: number)
-		local rarity = Skins.RarityInfo(s.Rarity)
-		local f = new("Frame", { Position = UDim2.fromOffset(x, 0), Size = UDim2.fromOffset(CELL - 10, 120), BackgroundColor3 = T.PanelLight, Parent = strip }, { Make.Corner(10), Make.Stroke(rarity.Color, 2) })
-		new("Frame", { Position = UDim2.fromOffset(8, 8), Size = UDim2.new(1, -16, 0, 60), BackgroundColor3 = s.Color, Parent = f }, { Make.Corner(8), new("UIGradient", { Color = ColorSequence.new(s.Color, s.Accent), Rotation = 30 }) })
-		Make.Label(s.DisplayName, { Position = UDim2.fromOffset(8, 74), Size = UDim2.new(1, -16, 0, 18), TextSize = 14, Parent = f })
-		Make.Label(s.Rarity, { Position = UDim2.fromOffset(8, 94), Size = UDim2.new(1, -16, 0, 16), TextSize = 12, TextColor3 = rarity.Color, Parent = f })
-	end
-
-	Make.Button("ABRIR CAJA", T.Gold, { AnchorPoint = Vector2.new(0.5, 0), Position = UDim2.new(0.5, 0, 0, 236), Size = UDim2.fromOffset(220, 52), TextColor3 = T.Bg, TextSize = 20, Parent = body }, function()
-		if rolling then
-			return
-		end
-		rolling = true
-		local res = Net.Function("BuyCrate"):InvokeServer()
-		if not res or not res.Ok then
-			result.Text = res and res.Error or "Error"
-			result.TextColor3 = T.Danger
-			rolling = false
-			return
-		end
-		clear(strip)
-		strip.Position = UDim2.fromOffset(0, 10)
-		local rng = Random.new()
-		local winIndex = 40
-		for i = 1, winIndex + 5 do
-			local s = if i == winIndex then Skins.Get(res.SkinId) else Skins.Roll(rng)
-			cellFor(s, (i - 1) * CELL)
-		end
-		local center = reel.AbsoluteSize.X / 2
-		local target = -((winIndex - 1) * CELL + (CELL - 10) / 2 - center) + rng:NextNumber(-40, 40)
-		result.Text = "..."
-		result.TextColor3 = T.Text
-		local tw = TweenService:Create(strip, TweenInfo.new(4.5, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Position = UDim2.fromOffset(target, 10) })
-		tw:Play()
-		tw.Completed:Wait()
-		local s = Skins.Get(res.SkinId)
-		local rarity = Skins.RarityInfo(s.Rarity)
-		result.Text = if res.Duplicate then string.format("%s (duplicado) · +%d monedas", s.DisplayName, res.Refund) else string.format("¡%s %s!", s.Rarity, s.DisplayName)
-		result.TextColor3 = rarity.Color
-		rolling = false
-	end)
 end
 
 -- Ranking --------------------------------------------------------------------
@@ -399,6 +385,8 @@ local function setVisible(visible: boolean)
 	end
 	if not visible then
 		MenuController.Close()
+		ShopUI.Close()
+		TradeUI.CloseAll()
 	end
 end
 
@@ -406,8 +394,10 @@ function MenuController.Start()
 	gui = new("ScreenGui", { Name = "Menu", ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 10, Parent = player:WaitForChild("PlayerGui") })
 	buildProfileCard()
 	buildDock()
+	buildBotPanel()
 	buildArsenal()
-	buildShop()
+	ShopUI.Build(gui)
+	TradeUI.Build(gui, HUDController.Toast)
 	buildLeaderboard()
 	buildStats()
 

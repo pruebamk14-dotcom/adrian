@@ -13,6 +13,7 @@ local Net = require(Shared.Net)
 local ArenaService = require(script.Parent.ArenaService)
 local DuelService = require(script.Parent.DuelService)
 local DataService = require(script.Parent.DataService)
+local BotService = require(script.Parent.BotService)
 
 type QueueEntry = { Player: Player, Since: number }
 
@@ -147,6 +148,37 @@ function MatchmakingService.Start()
 		Net.Event("QueueState"):FireClient(player, true, 0)
 	end)
 	Net.Event("LeaveQueue").OnServerEvent:Connect(leaveQueue)
+
+	-- Modo solo: duelo contra bot
+	local lastBotRequest: { [Player]: number } = {}
+	Net.Event("PlayBot").OnServerEvent:Connect(function(player, difficulty)
+		if type(difficulty) ~= "string" or not BotService.Difficulties[difficulty] then
+			return
+		end
+		if DuelService.IsBusy(player) or not DataService.Get(player) then
+			return
+		end
+		if lastBotRequest[player] and os.clock() - lastBotRequest[player] < 2 then
+			return
+		end
+		lastBotRequest[player] = os.clock()
+		leaveQueue(player)
+		if not BotService.IsReady() then
+			Net.Event("Notify"):FireClient(player, "El bot aún se está preparando, prueba en unos segundos", Color3.fromRGB(255, 200, 80))
+			return
+		end
+		local bot = BotService.Create(difficulty)
+		if not bot then
+			return
+		end
+		if not DuelService.StartDuel(player, bot, false) then
+			BotService.Destroy(bot)
+			Net.Event("Notify"):FireClient(player, "Todas las arenas están ocupadas, inténtalo enseguida", Color3.fromRGB(255, 120, 90))
+		end
+	end)
+	Players.PlayerRemoving:Connect(function(p)
+		lastBotRequest[p] = nil
+	end)
 	Players.PlayerRemoving:Connect(leaveQueue)
 
 	task.spawn(function()

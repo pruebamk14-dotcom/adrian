@@ -9,6 +9,7 @@ export type Skin = {
 	Accent: Color3,
 	Material: Enum.Material,
 	Glow: boolean?,
+	Crate: string, -- "Standard" | "Halloween"
 }
 
 local Rarities = {
@@ -19,7 +20,7 @@ local Rarities = {
 	{ Name = "Mítico", Weight = 0.5, Color = Color3.fromRGB(255, 61, 87) },
 }
 
-local function skin(id, name, rarity, color, accent, material, glow): Skin
+local function skin(id, name, rarity, color, accent, material, glow, crate): Skin
 	return {
 		Id = id,
 		DisplayName = name,
@@ -28,6 +29,7 @@ local function skin(id, name, rarity, color, accent, material, glow): Skin
 		Accent = accent,
 		Material = material,
 		Glow = glow,
+		Crate = crate or "Standard",
 	}
 end
 
@@ -44,6 +46,16 @@ local List: { [string]: Skin } = {
 	Gold = skin("Gold", "Oro 24k", "Legendario", Color3.fromRGB(255, 196, 40), Color3.fromRGB(120, 80, 10), Enum.Material.Foil),
 	Plasma = skin("Plasma", "Plasma", "Legendario", Color3.fromRGB(0, 230, 255), Color3.fromRGB(0, 40, 80), Enum.Material.ForceField, true),
 	Inferno = skin("Inferno", "Infierno", "Mítico", Color3.fromRGB(255, 80, 0), Color3.fromRGB(60, 0, 0), Enum.Material.Neon, true),
+
+	-- Halloween (caja de caramelos)
+	Pumpkin = skin("Pumpkin", "Calabaza", "Común", Color3.fromRGB(235, 120, 20), Color3.fromRGB(30, 20, 10), Enum.Material.SmoothPlastic, false, "Halloween"),
+	Spiderweb = skin("Spiderweb", "Telaraña", "Común", Color3.fromRGB(20, 20, 24), Color3.fromRGB(200, 200, 210), Enum.Material.Fabric, false, "Halloween"),
+	Bone = skin("Bone", "Hueso", "Raro", Color3.fromRGB(235, 228, 205), Color3.fromRGB(90, 80, 70), Enum.Material.Marble, false, "Halloween"),
+	CandyCorn = skin("CandyCorn", "Maíz dulce", "Raro", Color3.fromRGB(255, 200, 40), Color3.fromRGB(255, 255, 240), Enum.Material.SmoothPlastic, false, "Halloween"),
+	Witch = skin("Witch", "Bruja", "Épico", Color3.fromRGB(90, 30, 140), Color3.fromRGB(80, 255, 80), Enum.Material.Metal, true, "Halloween"),
+	Vampire = skin("Vampire", "Vampiro", "Épico", Color3.fromRGB(120, 0, 15), Color3.fromRGB(15, 0, 0), Enum.Material.Glass, true, "Halloween"),
+	Phantom = skin("Phantom", "Fantasma", "Legendario", Color3.fromRGB(200, 240, 255), Color3.fromRGB(120, 200, 255), Enum.Material.ForceField, true, "Halloween"),
+	Headless = skin("Headless", "Jinete sin cabeza", "Mítico", Color3.fromRGB(255, 110, 0), Color3.fromRGB(10, 10, 10), Enum.Material.Neon, true, "Halloween"),
 }
 
 local function rarityInfo(name: string)
@@ -55,7 +67,8 @@ local function rarityInfo(name: string)
 	return Rarities[1]
 end
 
-local function roll(rng: Random): Skin
+local function roll(rng: Random, crate: string?): Skin
+	crate = crate or "Standard"
 	local total = 0
 	for _, r in Rarities do
 		total += r.Weight
@@ -71,8 +84,16 @@ local function roll(rng: Random): Skin
 	end
 	local pool = {}
 	for _, s in List do
-		if s.Rarity == rarity and s.Id ~= "Default" then
+		if s.Rarity == rarity and s.Id ~= "Default" and s.Crate == crate then
 			table.insert(pool, s)
+		end
+	end
+	if #pool == 0 then
+		-- Rareza sin skins en esta caja: caer a cualquier skin de la caja
+		for _, s in List do
+			if s.Id ~= "Default" and s.Crate == crate then
+				table.insert(pool, s)
+			end
 		end
 	end
 	return pool[rng:NextInteger(1, #pool)]

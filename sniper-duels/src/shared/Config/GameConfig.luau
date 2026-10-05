@@ -2,6 +2,9 @@
 -- Ajustes globales del juego. Todo lo "tuneable" vive aquí.
 
 local GameConfig = {
+	-- Evento de temporada: arenas, lobby, skins y caramelos de Halloween
+	HalloweenEvent = true,
+
 	-- Duelos
 	RoundsToWin = 3, -- Mejor de 5
 	IntroTime = 4,
@@ -35,6 +38,9 @@ local GameConfig = {
 		WinXP = 120,
 		LossXP = 40,
 		RankedMultiplier = 1.5,
+		BotMultiplier = 0.5, -- duelos contra bot dan la mitad
+		KillCandy = 5,
+		WinCandy = 15,
 	},
 
 	-- Red / anti-cheat
@@ -53,19 +59,65 @@ local GameConfig = {
 
 	-- Crates
 	CratePrice = 300,
+	HalloweenCratePrice = 120, -- en caramelos
 	DuplicateRefund = 0.4,
+
+	-- Recompensa al subir de nivel: monedas = LevelUpCoinsBase + nivel * LevelUpCoinsPerLevel
+	LevelUpCoinsBase = 100,
+	LevelUpCoinsPerLevel = 25,
+
+	-- Monetización. Crea los productos en create.roblox.com
+	-- (tu experiencia -> Monetización -> Pases / Productos para desarrolladores)
+	-- y pega aquí sus IDs. Con 0 el botón aparece como "no disponible".
+	Monetization = {
+		GamePasses = {
+			VIP = 0, -- x2 monedas, x2 caramelos, etiqueta VIP dorada
+		},
+		Products = {
+			Coins1000 = 0,
+			Coins5000 = 0,
+			Coins15000 = 0,
+			Candy500 = 0,
+			WeaponReaper = 0,
+			WeaponObsidian = 0,
+		},
+		-- Precios orientativos para mostrar en la tienda (el real lo pone Roblox)
+		RobuxPrices = {
+			VIP = 399,
+			Coins1000 = 49,
+			Coins5000 = 199,
+			Coins15000 = 499,
+			Candy500 = 99,
+			WeaponReaper = 299,
+			WeaponObsidian = 449,
+		},
+		CoinPacks = {
+			Coins1000 = 1000,
+			Coins5000 = 5500, -- +10% bonus
+			Coins15000 = 18000, -- +20% bonus
+		},
+		CandyPacks = {
+			Candy500 = 500,
+		},
+		VIPMultiplier = 2,
+	},
+
+	-- Intercambios
+	TradeConfirmTime = 4, -- s de cuenta atrás tras aceptar ambos (anti-estafa)
+	TradeMaxItems = 8,
 
 	-- Sonidos (rbxassetid://...). Vacío = desactivado. Pon tus propios IDs.
 	Sounds = {
 		Fire = "",
 		Bolt = "",
 		Reload = "",
-		Hitmarker = "",
+		Hitmarker = "rbxasset://sounds/electronicpingshort.wav",
 		Headshot = "",
 		ScopeIn = "",
-		Countdown = "",
+		Countdown = "rbxasset://sounds/button.wav",
 		RoundWin = "",
 		RoundLose = "",
+		Thunder = "",
 	},
 }
 

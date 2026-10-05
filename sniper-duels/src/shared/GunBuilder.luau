@@ -1,14 +1,17 @@
 --!strict
 -- Construye el modelo del rifle con piezas primitivas para que el proyecto
 -- funcione sin assets externos. Sustituible por un MeshPart importado:
--- basta con mantener "Handle" (PrimaryPart) y el Attachment "Muzzle".
+-- basta con mantener PrimaryPart mirando a -Z, el Attachment "Muzzle",
+-- el Attachment "Ejection" y la pieza "ScopeLens".
 
 local Skins = require(script.Parent.Config.Skins)
 local Weapons = require(script.Parent.Config.Weapons)
 
 local GunBuilder = {}
 
-local function part(model: Model, name: string, size: Vector3, offset: CFrame, kind: string, shape: Enum.PartType?)
+local CYL = CFrame.Angles(0, math.rad(90), 0) -- eje del cilindro (X) -> Z
+
+local function part(model: Model, name: string, size: Vector3, offset: CFrame, kind: string, shape: Enum.PartType?): Part
 	local p = Instance.new("Part")
 	p.Name = name
 	p.Size = size
@@ -29,6 +32,21 @@ local function part(model: Model, name: string, size: Vector3, offset: CFrame, k
 	return p
 end
 
+local function wedge(model: Model, name: string, size: Vector3, offset: CFrame, kind: string): WedgePart
+	local p = Instance.new("WedgePart")
+	p.Name = name
+	p.Size = size
+	p.CFrame = offset
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.Massless = true
+	p.CastShadow = false
+	p:SetAttribute("SkinKind", kind)
+	p.Parent = model
+	return p
+end
+
 function GunBuilder.ApplySkin(model: Model, skinId: string)
 	local s = Skins.Get(skinId)
 	for _, d in model:GetDescendants() do
@@ -39,11 +57,15 @@ function GunBuilder.ApplySkin(model: Model, skinId: string)
 				d.Material = s.Material
 			elseif kind == "Accent" then
 				d.Color = s.Accent
+				d.Material = if s.Glow then Enum.Material.Neon else Enum.Material.Metal
+			elseif kind == "Metal" then
+				d.Color = Color3.fromRGB(38, 38, 42)
 				d.Material = Enum.Material.Metal
 			elseif kind == "Glass" then
-				d.Color = Color3.fromRGB(20, 30, 40)
+				d.Color = Color3.fromRGB(40, 70, 110)
 				d.Material = Enum.Material.Glass
-				d.Transparency = 0.2
+				d.Transparency = 0.15
+				d.Reflectance = 0.4
 			end
 		end
 	end
@@ -52,13 +74,13 @@ function GunBuilder.ApplySkin(model: Model, skinId: string)
 		glow:Destroy()
 	end
 	if s.Glow then
-		local body = model:FindFirstChild("Stock") :: BasePart?
+		local body = model:FindFirstChild("Receiver") :: BasePart?
 		if body then
 			local light = Instance.new("PointLight")
 			light.Name = "SkinGlow"
 			light.Color = s.Color
-			light.Range = 6
-			light.Brightness = 1.5
+			light.Range = 7
+			light.Brightness = 1.6
 			light.Parent = body
 		end
 	end
@@ -70,27 +92,57 @@ function GunBuilder.Build(weaponId: string, skinId: string): Model
 	local model = Instance.new("Model")
 	model.Name = "Rifle"
 
-	local handle = part(model, "Handle", Vector3.new(0.3, 0.7, 0.4), CFrame.new(0, -0.35, 0.2) * CFrame.Angles(math.rad(-15), 0, 0), "Body")
-	local receiver = part(model, "Receiver", Vector3.new(0.35, 0.45, 1.6), CFrame.new(0, 0, -0.3), "Body")
-	part(model, "Stock", Vector3.new(0.3, 0.55, 1.4), CFrame.new(0, -0.08, 1.15), "Body")
-	part(model, "Barrel", Vector3.new(0.14, 0.14, L), CFrame.new(0, 0.05, -1.1 - L / 2), "Accent")
-	part(model, "Suppressor", Vector3.new(0.22, 0.22, 0.6), CFrame.new(0, 0.05, -1.1 - L - 0.2), "Accent")
-	part(model, "Mag", Vector3.new(0.25, 0.5, 0.35), CFrame.new(0, -0.4, -0.45), "Accent")
-	part(model, "Bolt", Vector3.new(0.1, 0.1, 0.35), CFrame.new(0.25, 0.12, 0.1) * CFrame.Angles(0, 0, math.rad(90)), "Accent")
-	part(model, "ScopeTube", Vector3.new(0.24, 0.24, 1.5), CFrame.new(0, 0.42, -0.35), "Accent")
-	part(model, "ScopeFront", Vector3.new(0.34, 0.34, 0.25), CFrame.new(0, 0.42, -1.15), "Accent")
-	part(model, "ScopeLens", Vector3.new(0.28, 0.28, 0.02), CFrame.new(0, 0.42, -1.28), "Glass")
-	part(model, "BipodL", Vector3.new(0.06, 0.6, 0.06), CFrame.new(-0.12, -0.25, -1.9) * CFrame.Angles(0, 0, math.rad(15)), "Accent")
-	part(model, "BipodR", Vector3.new(0.06, 0.6, 0.06), CFrame.new(0.12, -0.25, -1.9) * CFrame.Angles(0, 0, math.rad(-15)), "Accent")
+	-- Cuerpo
+	local receiver = part(model, "Receiver", Vector3.new(0.34, 0.42, 1.7), CFrame.new(0, 0, -0.3), "Body")
+	part(model, "ReceiverTop", Vector3.new(0.26, 0.08, 1.5), CFrame.new(0, 0.25, -0.3), "Metal")
+	part(model, "Rail", Vector3.new(0.18, 0.06, 1.4), CFrame.new(0, 0.31, -0.3), "Metal")
+	part(model, "Handguard", Vector3.new(0.3, 0.32, 1.3), CFrame.new(0, 0.0, -1.7), "Body")
+	part(model, "Grip", Vector3.new(0.24, 0.62, 0.32), CFrame.new(0, -0.42, 0.25) * CFrame.Angles(math.rad(-18), 0, 0), "Body")
+	part(model, "TriggerGuard", Vector3.new(0.06, 0.06, 0.42), CFrame.new(0, -0.32, -0.05), "Metal")
+	part(model, "Trigger", Vector3.new(0.04, 0.16, 0.04), CFrame.new(0, -0.25, -0.02), "Metal")
+	part(model, "Mag", Vector3.new(0.24, 0.52, 0.34), CFrame.new(0, -0.42, -0.6) * CFrame.Angles(math.rad(8), 0, 0), "Metal")
+
+	-- Culata con pieza en cuña
+	part(model, "Stock", Vector3.new(0.28, 0.36, 1.2), CFrame.new(0, -0.05, 1.1), "Body")
+	wedge(model, "StockWedge", Vector3.new(0.28, 0.36, 0.9), CFrame.new(0, -0.38, 1.25) * CFrame.Angles(0, math.rad(180), math.rad(180)), "Body")
+	part(model, "Cheek", Vector3.new(0.22, 0.12, 0.7), CFrame.new(0, 0.18, 1.05), "Accent")
+	part(model, "ButtPad", Vector3.new(0.3, 0.72, 0.1), CFrame.new(0, -0.2, 1.74), "Metal")
+
+	-- Cañón cilíndrico + supresor
+	part(model, "Barrel", Vector3.new(L, 0.13, 0.13), CFrame.new(0, 0.05, -1.15 - L / 2) * CYL, "Metal", Enum.PartType.Cylinder)
+	part(model, "Suppressor", Vector3.new(0.75, 0.24, 0.24), CFrame.new(0, 0.05, -1.15 - L - 0.3) * CYL, "Accent", Enum.PartType.Cylinder)
+	part(model, "MuzzleBrake", Vector3.new(0.12, 0.27, 0.27), CFrame.new(0, 0.05, -1.15 - L - 0.7) * CYL, "Metal", Enum.PartType.Cylinder)
+
+	-- Cerrojo
+	part(model, "Bolt", Vector3.new(0.4, 0.09, 0.09), CFrame.new(0.24, 0.1, 0.15), "Metal", Enum.PartType.Cylinder)
+	part(model, "BoltKnob", Vector3.new(0.14, 0.14, 0.14), CFrame.new(0.45, 0.1, 0.15), "Metal", Enum.PartType.Ball)
+
+	-- Mira telescópica
+	part(model, "ScopeTube", Vector3.new(1.6, 0.22, 0.22), CFrame.new(0, 0.52, -0.35) * CYL, "Accent", Enum.PartType.Cylinder)
+	part(model, "ScopeBell", Vector3.new(0.38, 0.34, 0.34), CFrame.new(0, 0.52, -1.25) * CYL, "Accent", Enum.PartType.Cylinder)
+	part(model, "ScopeEye", Vector3.new(0.3, 0.28, 0.28), CFrame.new(0, 0.52, 0.5) * CYL, "Accent", Enum.PartType.Cylinder)
+	part(model, "Turret", Vector3.new(0.16, 0.14, 0.14), CFrame.new(0, 0.66, -0.35) * CFrame.Angles(0, 0, math.rad(90)), "Metal", Enum.PartType.Cylinder)
+	part(model, "TurretSide", Vector3.new(0.14, 0.14, 0.14), CFrame.new(0.15, 0.52, -0.35), "Metal", Enum.PartType.Cylinder)
+	part(model, "RingFront", Vector3.new(0.12, 0.3, 0.3), CFrame.new(0, 0.42, -0.85) * CYL, "Metal", Enum.PartType.Cylinder)
+	part(model, "RingBack", Vector3.new(0.12, 0.3, 0.3), CFrame.new(0, 0.42, 0.1) * CYL, "Metal", Enum.PartType.Cylinder)
+	part(model, "ScopeLens", Vector3.new(0.02, 0.3, 0.3), CFrame.new(0, 0.52, -1.45) * CYL, "Glass", Enum.PartType.Cylinder)
+
+	-- Bípode plegado
+	part(model, "BipodL", Vector3.new(0.06, 0.06, 0.9), CFrame.new(-0.1, -0.2, -2.0) * CFrame.Angles(math.rad(-8), 0, 0), "Metal")
+	part(model, "BipodR", Vector3.new(0.06, 0.06, 0.9), CFrame.new(0.1, -0.2, -2.0) * CFrame.Angles(math.rad(-8), 0, 0), "Metal")
 
 	model.PrimaryPart = receiver
 
 	local muzzle = Instance.new("Attachment")
 	muzzle.Name = "Muzzle"
-	muzzle.Position = Vector3.new(0, 0.05, -(1.1 + L + 0.55)) - receiver.Position
+	muzzle.Position = receiver.CFrame:PointToObjectSpace(Vector3.new(0, 0.05, -1.15 - L - 0.8))
 	muzzle.Parent = receiver
 
-	-- Soldar todo al receiver
+	local ejection = Instance.new("Attachment")
+	ejection.Name = "Ejection"
+	ejection.Position = receiver.CFrame:PointToObjectSpace(Vector3.new(0.2, 0.15, -0.1))
+	ejection.Parent = receiver
+
 	for _, p in model:GetChildren() do
 		if p:IsA("BasePart") and p ~= receiver then
 			local weld = Instance.new("WeldConstraint")
@@ -99,7 +151,6 @@ function GunBuilder.Build(weaponId: string, skinId: string): Model
 			weld.Parent = p
 		end
 	end
-	handle.Name = "Grip"
 
 	GunBuilder.ApplySkin(model, skinId)
 	model:SetAttribute("WeaponId", w.Id)

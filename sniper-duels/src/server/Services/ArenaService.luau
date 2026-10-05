@@ -1,16 +1,20 @@
 --!strict
--- Genera el lobby y un pool de arenas simétricas (justas para ambos lados).
--- Si ya existe una carpeta "Arenas" o "Lobby" en Workspace hecha a mano,
--- se respeta y no se genera nada: así un builder puede reemplazar el mapa.
+-- Genera el lobby y un pool de arenas simétricas (justas para ambos lados)
+-- con terreno real, colinas, niebla, luces y props temáticos.
+-- Si ya existe una carpeta "Arenas" o un modelo "Lobby" en Workspace hecho a
+-- mano, se respeta y no se genera nada: así un builder puede reemplazar el mapa.
 --
 -- Formato de arena manual: Model con Parts "SpawnA" y "SpawnB".
 -- Formato de lobby manual: Model con Parts "LobbySpawn" y pares "PadA_n"/"PadB_n".
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Lighting = game:GetService("Lighting")
 
 local Shared = ReplicatedStorage:WaitForChild("Shared")
 local GameConfig = require(Shared.Config.GameConfig)
+
+local World = script.Parent.Parent.World
+local Props = require(World.Props)
+local Environment = require(World.Environment)
 
 local ArenaService = {}
 
@@ -30,43 +34,33 @@ export type PadPair = {
 	Label: TextLabel,
 }
 
+type Theme = {
+	Name: string,
+	Ground: Enum.Material,
+	Patch: Enum.Material,
+	Hill: Enum.Material,
+	Cover: Color3,
+	CoverMat: Enum.Material,
+	Accent: Color3,
+	Style: string,
+}
+
 local arenas: { Arena } = {}
 local padPairs: { PadPair } = {}
 local lobbySpawn = CFrame.new(0, 5, 0)
 
-local THEMES = {
-	{
-		Name = "Lost Hill",
-		Ground = Color3.fromRGB(58, 56, 54),
-		GroundMat = Enum.Material.Basalt,
-		Cover = Color3.fromRGB(92, 88, 82),
-		CoverMat = Enum.Material.Rock,
-		Accent = Color3.fromRGB(0, 255, 140),
-	},
-	{
-		Name = "Dunas",
-		Ground = Color3.fromRGB(214, 186, 132),
-		GroundMat = Enum.Material.Sand,
-		Cover = Color3.fromRGB(170, 140, 100),
-		CoverMat = Enum.Material.Sandstone,
-		Accent = Color3.fromRGB(255, 140, 40),
-	},
-	{
-		Name = "Tundra",
-		Ground = Color3.fromRGB(235, 240, 245),
-		GroundMat = Enum.Material.Snow,
-		Cover = Color3.fromRGB(160, 190, 210),
-		CoverMat = Enum.Material.Ice,
-		Accent = Color3.fromRGB(80, 180, 255),
-	},
-	{
-		Name = "Neón",
-		Ground = Color3.fromRGB(20, 20, 28),
-		GroundMat = Enum.Material.SmoothPlastic,
-		Cover = Color3.fromRGB(35, 35, 50),
-		CoverMat = Enum.Material.Metal,
-		Accent = Color3.fromRGB(255, 0, 170),
-	},
+local HALLOWEEN_THEMES: { Theme } = {
+	{ Name = "Cementerio Olvidado", Ground = Enum.Material.Grass, Patch = Enum.Material.Mud, Hill = Enum.Material.Grass, Cover = Color3.fromRGB(100, 98, 106), CoverMat = Enum.Material.Brick, Accent = Color3.fromRGB(255, 120, 20), Style = "graves" },
+	{ Name = "Granja de Calabazas", Ground = Enum.Material.LeafyGrass, Patch = Enum.Material.Ground, Hill = Enum.Material.Grass, Cover = Color3.fromRGB(90, 62, 42), CoverMat = Enum.Material.WoodPlanks, Accent = Color3.fromRGB(255, 150, 30), Style = "farm" },
+	{ Name = "Mansión Embrujada", Ground = Enum.Material.Cobblestone, Patch = Enum.Material.Slate, Hill = Enum.Material.Rock, Cover = Color3.fromRGB(95, 80, 78), CoverMat = Enum.Material.Brick, Accent = Color3.fromRGB(170, 70, 255), Style = "ruins" },
+	{ Name = "Bosque Maldito", Ground = Enum.Material.Mud, Patch = Enum.Material.LeafyGrass, Hill = Enum.Material.Rock, Cover = Color3.fromRGB(80, 78, 84), CoverMat = Enum.Material.Rock, Accent = Color3.fromRGB(90, 255, 120), Style = "forest" },
+}
+
+local NORMAL_THEMES: { Theme } = {
+	{ Name = "Lost Hill", Ground = Enum.Material.Ground, Patch = Enum.Material.Rock, Hill = Enum.Material.Rock, Cover = Color3.fromRGB(92, 88, 82), CoverMat = Enum.Material.Rock, Accent = Color3.fromRGB(0, 255, 140), Style = "rocks" },
+	{ Name = "Dunas", Ground = Enum.Material.Sand, Patch = Enum.Material.Sandstone, Hill = Enum.Material.Sandstone, Cover = Color3.fromRGB(170, 140, 100), CoverMat = Enum.Material.Sandstone, Accent = Color3.fromRGB(255, 140, 40), Style = "rocks" },
+	{ Name = "Tundra", Ground = Enum.Material.Snow, Patch = Enum.Material.Glacier, Hill = Enum.Material.Snow, Cover = Color3.fromRGB(160, 190, 210), CoverMat = Enum.Material.Ice, Accent = Color3.fromRGB(80, 180, 255), Style = "rocks" },
+	{ Name = "Pradera", Ground = Enum.Material.Grass, Patch = Enum.Material.Ground, Hill = Enum.Material.Grass, Cover = Color3.fromRGB(100, 96, 90), CoverMat = Enum.Material.Rock, Accent = Color3.fromRGB(255, 220, 80), Style = "rocks" },
 }
 
 local function block(parent: Instance, name: string, size: Vector3, cf: CFrame, color: Color3, mat: Enum.Material): Part
@@ -83,72 +77,234 @@ local function block(parent: Instance, name: string, size: Vector3, cf: CFrame, 
 	return p
 end
 
+local function barrier(parent: Instance, size: Vector3, cf: CFrame)
+	local b = block(parent, "Barrier", size, cf, Color3.new(), Enum.Material.SmoothPlastic)
+	b.Transparency = 1
+	b.CanQuery = false
+	b.CastShadow = false
+end
+
+-- Colinas de terreno alrededor de un rectángulo (decoran y tapan los límites)
+local function hillsAround(center: Vector3, w: number, l: number, mat: Enum.Material, rng: Random)
+	local terrain = workspace.Terrain
+	local function ball(pos: Vector3)
+		terrain:FillBall(pos, rng:NextNumber(30, 44), mat)
+	end
+	for z = -l / 2, l / 2, 34 do
+		ball(center + Vector3.new(-(w / 2 + 40), rng:NextNumber(-6, 10), z))
+		ball(center + Vector3.new(w / 2 + 40, rng:NextNumber(-6, 10), z))
+	end
+	for x = -w / 2, w / 2, 34 do
+		ball(center + Vector3.new(x, rng:NextNumber(-6, 10), -(l / 2 + 40)))
+		ball(center + Vector3.new(x, rng:NextNumber(-6, 10), l / 2 + 40))
+	end
+end
+
 local function buildArena(index: number, origin: Vector3): Arena
-	local theme = THEMES[(index - 1) % #THEMES + 1]
+	local themes = if GameConfig.HalloweenEvent then HALLOWEEN_THEMES else NORMAL_THEMES
+	local theme = themes[(index - 1) % #themes + 1]
 	local rng = Random.new(index * 7919)
+	local terrain = workspace.Terrain
 	local model = Instance.new("Model")
 	model.Name = string.format("Arena_%02d_%s", index, theme.Name)
 
 	local W, L = 140, 360
 	local base = CFrame.new(origin)
-	block(model, "Ground", Vector3.new(W, 4, L), base * CFrame.new(0, -2, 0), theme.Ground, theme.GroundMat)
-
-	-- Muros perimetrales
-	local wallH = 60
-	for _, side in { -1, 1 } do
-		block(model, "WallX", Vector3.new(4, wallH, L), base * CFrame.new(side * (W / 2 + 2), wallH / 2, 0), theme.Cover, theme.CoverMat)
-		block(model, "WallZ", Vector3.new(W + 8, wallH, 4), base * CFrame.new(0, wallH / 2, side * (L / 2 + 2)), theme.Cover, theme.CoverMat)
-	end
-	local ceiling = block(model, "Ceiling", Vector3.new(W + 8, 2, L + 8), base * CFrame.new(0, wallH + 1, 0), theme.Cover, theme.CoverMat)
-	ceiling.Transparency = 1
-	ceiling.CanQuery = false
-
-	-- Cobertura simétrica: se genera la mitad A y se refleja 180° para B
-	local half = Instance.new("Folder")
-	half.Name = "Cover"
-	half.Parent = model
 	local mirror = CFrame.Angles(0, math.pi, 0)
-	local function coverPair(size: Vector3, localCf: CFrame, name: string)
-		block(half, name, size, base * localCf, theme.Cover, theme.CoverMat)
-		block(half, name, size, base * mirror * localCf, theme.Cover, theme.CoverMat)
-	end
 
-	-- Bunker de spawn
-	coverPair(Vector3.new(26, 7, 3), CFrame.new(0, 3.5, -L / 2 + 30), "SpawnWall")
-	coverPair(Vector3.new(3, 7, 14), CFrame.new(-14, 3.5, -L / 2 + 24), "SpawnWall")
-	coverPair(Vector3.new(3, 7, 14), CFrame.new(14, 3.5, -L / 2 + 24), "SpawnWall")
-
-	-- Cobertura media procedural
-	for _ = 1, 9 do
-		local h = rng:NextInteger(4, 14)
-		local size = Vector3.new(rng:NextInteger(4, 16), h, rng:NextInteger(3, 10))
-		local x = rng:NextNumber(-W / 2 + 10, W / 2 - 10)
-		local z = rng:NextNumber(-L / 2 + 50, -14)
-		coverPair(size, CFrame.new(x, h / 2, z) * CFrame.Angles(0, math.rad(rng:NextInteger(-30, 30)), 0), "Cover")
+	-- Suelo de terreno con parches simétricos
+	terrain:FillBlock(base * CFrame.new(0, -6, 0), Vector3.new(W + 120, 12, L + 120), theme.Ground)
+	for _ = 1, 10 do
+		-- Una capa completa de vóxel (4 studs) para no dejar hundimientos
+		local size = Vector3.new(rng:NextNumber(8, 26), 4, rng:NextNumber(8, 30))
+		local local_ = CFrame.new(rng:NextNumber(-W / 2, W / 2), -2, rng:NextNumber(-L / 2, 0)) * CFrame.Angles(0, rng:NextNumber(0, math.pi), 0)
+		terrain:FillBlock(base * local_, size, theme.Patch)
+		terrain:FillBlock(base * mirror * local_, size, theme.Patch)
 	end
-	-- Torre de francotirador (alto riesgo / alta recompensa)
-	coverPair(Vector3.new(10, 1, 10), CFrame.new(W / 2 - 14, 16, -L / 2 + 70), "TowerFloor")
-	coverPair(Vector3.new(1.5, 16, 1.5), CFrame.new(W / 2 - 18, 8, -L / 2 + 66), "TowerLeg")
-	coverPair(Vector3.new(1.5, 16, 1.5), CFrame.new(W / 2 - 10, 8, -L / 2 + 74), "TowerLeg")
-	coverPair(Vector3.new(10, 3.5, 1), CFrame.new(W / 2 - 14, 18.25, -L / 2 + 74.5), "TowerRail")
-	for i = 0, 7 do
-		coverPair(Vector3.new(4, 1, 2), CFrame.new(W / 2 - 24, 1 + i * 2, -L / 2 + 58 + i * 2), "Stair")
-	end
-	-- Muro central bajo para cruzar
-	block(half, "MidWall", Vector3.new(30, 5, 3), base * CFrame.new(0, 2.5, 0), theme.Cover, theme.CoverMat)
+	hillsAround(origin, W, L, theme.Hill, rng)
 
-	-- Líneas de neón de acento
+	-- Límites invisibles (las colinas hacen de pared visual)
+	local wallH = 80
 	for _, side in { -1, 1 } do
-		local strip = block(model, "Accent", Vector3.new(0.4, 0.4, L), base * CFrame.new(side * (W / 2 - 0.2), 0.2, 0), theme.Accent, Enum.Material.Neon)
-		strip.CanCollide = false
+		barrier(model, Vector3.new(4, wallH, L + 8), base * CFrame.new(side * (W / 2 + 2), wallH / 2, 0))
+		barrier(model, Vector3.new(W + 8, wallH, 4), base * CFrame.new(0, wallH / 2, side * (L / 2 + 2)))
+	end
+	barrier(model, Vector3.new(W + 8, 2, L + 8), base * CFrame.new(0, wallH + 1, 0))
+
+	local cover = Instance.new("Folder")
+	cover.Name = "Cover"
+	cover.Parent = model
+
+	-- Coloca el mismo prop en el lado A y reflejado en el lado B
+	local function pair(localCf: CFrame, build: (parent: Instance, cf: CFrame, r: Random) -> ())
+		local seed = rng:NextInteger(1, 1e9)
+		build(cover, base * localCf, Random.new(seed))
+		build(cover, base * mirror * localCf, Random.new(seed))
+	end
+	local function solid(size: Vector3, localCf: CFrame, name: string)
+		pair(localCf, function(parent, cf)
+			block(parent, name, size, cf, theme.Cover, theme.CoverMat)
+		end)
+	end
+	local function randomSpot(zMin: number, zMax: number): CFrame
+		return CFrame.new(rng:NextNumber(-W / 2 + 10, W / 2 - 10), 0, rng:NextNumber(zMin, zMax)) * CFrame.Angles(0, rng:NextNumber(-0.6, 0.6), 0)
 	end
 
-	local spawnA = block(model, "SpawnA", Vector3.new(6, 1, 6), base * CFrame.new(0, 0.5, -L / 2 + 15), theme.Accent, Enum.Material.Neon)
-	local spawnB = block(model, "SpawnB", Vector3.new(6, 1, 6), base * mirror * CFrame.new(0, 0.5, -L / 2 + 15), theme.Accent, Enum.Material.Neon)
-	spawnA.CanCollide = false
-	spawnB.CanCollide = false
-	spawnA.Transparency = 0.6
-	spawnB.Transparency = 0.6
+	-- Búnker de spawn
+	solid(Vector3.new(26, 7, 3), CFrame.new(0, 3.5, -L / 2 + 30), "SpawnWall")
+	solid(Vector3.new(3, 7, 14), CFrame.new(-14, 3.5, -L / 2 + 24), "SpawnWall")
+	solid(Vector3.new(3, 7, 14), CFrame.new(14, 3.5, -L / 2 + 24), "SpawnWall")
+	pair(CFrame.new(-10, 0, -L / 2 + 32), function(parent, cf)
+		Props.Lantern(parent, cf, theme.Accent)
+	end)
+
+	-- Cobertura temática
+	local style = theme.Style
+	if style == "graves" then
+		for _ = 1, 2 do
+			pair(randomSpot(-L / 2 + 70, -40), function(parent, cf)
+				Props.Crypt(parent, cf)
+			end)
+		end
+		for _ = 1, 5 do
+			local center = randomSpot(-L / 2 + 50, -16)
+			for g = 0, 2 do
+				pair(center * CFrame.new(g * 3.4 - 3.4, 0, 0), function(parent, cf)
+					Props.Grave(parent, cf, 1.15)
+				end)
+			end
+		end
+		for _ = 1, 4 do
+			pair(randomSpot(-L / 2 + 50, -20), function(parent, cf, r)
+				Props.DeadTree(parent, cf, r:NextNumber(18, 28), r)
+			end)
+		end
+		pair(CFrame.new(-W / 2 + 20, 0, -60), function(parent, cf)
+			Props.Fence(parent, cf.Position, (cf * CFrame.new(0, 0, 30)).Position)
+		end)
+	elseif style == "farm" then
+		for _ = 1, 6 do
+			local spot = randomSpot(-L / 2 + 50, -18)
+			local stack = rng:NextInteger(1, 3)
+			pair(spot, function(parent, cf)
+				for s = 0, stack - 1 do
+					Props.HayBale(parent, cf * CFrame.new(0, s * 3.4, 0) * CFrame.Angles(0, s * 0.3, 0))
+				end
+			end)
+		end
+		for _ = 1, 3 do
+			pair(randomSpot(-L / 2 + 60, -30), function(parent, cf)
+				Props.Scarecrow(parent, cf)
+			end)
+		end
+		for _ = 1, 3 do
+			local patch = randomSpot(-L / 2 + 50, -20)
+			for i = 1, 6 do
+				pair(patch * CFrame.new(rng:NextNumber(-8, 8), 0, rng:NextNumber(-8, 8)), function(parent, cf, r)
+					Props.Pumpkin(parent, cf, r:NextNumber(2, 3.4), i == 1)
+				end)
+			end
+		end
+		pair(randomSpot(-L / 2 + 80, -50), function(parent, cf, r)
+			local barn = Props.RuinWall(parent, cf, 18, 12, r)
+			for _, c in barn:GetChildren() do
+				if c:IsA("BasePart") then
+					c.Material = Enum.Material.WoodPlanks
+					c.Color = Color3.fromRGB(120, 40, 30)
+				end
+			end
+		end)
+	elseif style == "ruins" then
+		for _ = 1, 7 do
+			pair(randomSpot(-L / 2 + 50, -16), function(parent, cf, r)
+				Props.RuinWall(parent, cf, r:NextNumber(8, 16), r:NextNumber(6, 13), r)
+			end)
+		end
+		for _ = 1, 4 do
+			pair(randomSpot(-L / 2 + 50, -16), function(parent, cf)
+				block(parent, "Pillar", Vector3.new(14, 2.4, 2.4), cf * CFrame.new(0, 7, 0) * CFrame.Angles(0, 0, math.rad(90)), Color3.fromRGB(150, 145, 150), Enum.Material.Marble).Shape = Enum.PartType.Cylinder
+			end)
+		end
+		pair(randomSpot(-L / 2 + 60, -40), function(parent, cf)
+			Props.Cauldron(parent, cf)
+			for c = 0, 4 do
+				Props.Candle(parent, cf * CFrame.Angles(0, c * math.rad(72), 0) * CFrame.new(0, 0, 3.5))
+			end
+		end)
+		pair(randomSpot(-L / 2 + 70, -40), function(parent, cf)
+			Props.Crypt(parent, cf)
+		end)
+	elseif style == "forest" then
+		for _ = 1, 9 do
+			pair(randomSpot(-L / 2 + 45, -12), function(parent, cf, r)
+				Props.DeadTree(parent, cf, r:NextNumber(20, 34), r)
+			end)
+		end
+		for _ = 1, 6 do
+			local size = Vector3.new(rng:NextNumber(5, 12), rng:NextNumber(4, 9), rng:NextNumber(5, 10))
+			pair(randomSpot(-L / 2 + 50, -16), function(parent, cf)
+				Props.Rock(parent, cf, size, theme.Cover)
+			end)
+		end
+		for _ = 1, 4 do
+			pair(randomSpot(-L / 2 + 50, -20), function(parent, cf)
+				Props.Pumpkin(parent, cf, 2.6, true)
+			end)
+		end
+	else -- rocks
+		for _ = 1, 10 do
+			local size = Vector3.new(rng:NextNumber(5, 15), rng:NextNumber(4, 12), rng:NextNumber(4, 10))
+			pair(randomSpot(-L / 2 + 50, -14), function(parent, cf)
+				Props.Rock(parent, cf, size, theme.Cover)
+			end)
+		end
+	end
+
+	-- Torre de francotirador (alto riesgo / alta recompensa)
+	local wood, woodMat = Color3.fromRGB(70, 50, 36), Enum.Material.WoodPlanks
+	pair(CFrame.new(W / 2 - 14, 0, -L / 2 + 70), function(parent, cf)
+		block(parent, "TowerFloor", Vector3.new(10, 1, 10), cf * CFrame.new(0, 16, 0), wood, woodMat)
+		for _, o in { Vector2.new(-4, -4), Vector2.new(4, -4), Vector2.new(-4, 4), Vector2.new(4, 4) } do
+			block(parent, "TowerLeg", Vector3.new(1.2, 16, 1.2), cf * CFrame.new(o.X, 8, o.Y), wood, Enum.Material.Wood)
+		end
+		block(parent, "TowerRail", Vector3.new(10, 3.5, 1), cf * CFrame.new(0, 18.25, 4.5), wood, woodMat)
+		block(parent, "TowerRoof", Vector3.new(11, 0.6, 11), cf * CFrame.new(0, 24, 0), Color3.fromRGB(40, 30, 25), woodMat)
+		for _, o in { Vector2.new(-4.5, -4.5), Vector2.new(4.5, 4.5) } do
+			block(parent, "RoofPost", Vector3.new(0.5, 7.5, 0.5), cf * CFrame.new(o.X, 20, o.Y), wood, Enum.Material.Wood)
+		end
+		for i = 0, 7 do
+			block(parent, "Stair", Vector3.new(4, 1, 2), cf * CFrame.new(-10, 1 + i * 2, -12 + i * 2), wood, woodMat)
+		end
+		if GameConfig.HalloweenEvent then
+			Props.Pumpkin(parent, cf * CFrame.new(3, 16.5, -3), 1.6, true)
+			Props.Web(parent, cf * CFrame.new(0, 21.5, 5.1), 4)
+		end
+	end)
+
+	-- Muro central bajo y ambientación
+	block(cover, "MidWall", Vector3.new(30, 5, 3), base * CFrame.new(0, 2.5, 0), theme.Cover, theme.CoverMat)
+	for _, side in { -1, 1 } do
+		for z = -L / 2 + 50, L / 2 - 50, 90 do
+			Props.Lantern(cover, base * CFrame.new(side * (W / 2 - 3), 0, z) * CFrame.Angles(0, if side > 0 then math.rad(90) else math.rad(-90), 0), theme.Accent)
+		end
+	end
+	if GameConfig.HalloweenEvent then
+		for _ = 1, 6 do
+			local m = block(model, "MistSource", Vector3.new(1, 1, 1), base * CFrame.new(rng:NextNumber(-W / 2, W / 2), 0.5, rng:NextNumber(-L / 2, L / 2)), Color3.new(), Enum.Material.SmoothPlastic)
+			m.Transparency = 1
+			m.CanCollide = false
+			m.CanQuery = false
+			Props.Mist(m, Color3.fromRGB(190, 170, 210), 2)
+		end
+	end
+
+	local spawnA = block(model, "SpawnA", Vector3.new(6, 0.4, 6), base * CFrame.new(0, 0.2, -L / 2 + 15), theme.Accent, Enum.Material.Neon)
+	local spawnB = block(model, "SpawnB", Vector3.new(6, 0.4, 6), base * mirror * CFrame.new(0, 0.2, -L / 2 + 15), theme.Accent, Enum.Material.Neon)
+	for _, s in { spawnA, spawnB } do
+		s.CanCollide = false
+		s.CanQuery = false
+		s.Transparency = 0.5
+	end
 
 	model:SetAttribute("Theme", theme.Name)
 	return {
@@ -163,17 +319,16 @@ end
 
 local function padLabel(pad: BasePart, text: string): TextLabel
 	local gui = Instance.new("BillboardGui")
-	gui.Size = UDim2.fromOffset(220, 60)
-	gui.StudsOffset = Vector3.new(0, 5, 0)
-	gui.AlwaysOnTop = false
-	gui.MaxDistance = 80
+	gui.Size = UDim2.fromOffset(240, 70)
+	gui.StudsOffset = Vector3.new(0, 6, 0)
+	gui.MaxDistance = 90
 	local label = Instance.new("TextLabel")
 	label.Size = UDim2.fromScale(1, 1)
 	label.BackgroundTransparency = 1
-	label.Font = Enum.Font.GothamBlack
+	label.Font = if GameConfig.HalloweenEvent then Enum.Font.Creepster else Enum.Font.GothamBlack
 	label.TextScaled = true
 	label.TextColor3 = Color3.new(1, 1, 1)
-	label.TextStrokeTransparency = 0.4
+	label.TextStrokeTransparency = 0.3
 	label.Text = text
 	label.Parent = gui
 	gui.Parent = pad
@@ -181,45 +336,95 @@ local function padLabel(pad: BasePart, text: string): TextLabel
 end
 
 local function buildLobby(): Model
+	local halloween = GameConfig.HalloweenEvent
+	local rng = Random.new(31)
+	local terrain = workspace.Terrain
 	local lobby = Instance.new("Model")
 	lobby.Name = "Lobby"
-	block(lobby, "Floor", Vector3.new(220, 4, 220), CFrame.new(0, -2, 0), Color3.fromRGB(32, 34, 40), Enum.Material.Concrete)
+
+	terrain:FillBlock(CFrame.new(0, -6, 0), Vector3.new(320, 12, 320), Enum.Material.Grass)
+	terrain:FillBlock(CFrame.new(0, -2, 10), Vector3.new(16, 4, 120), Enum.Material.Cobblestone)
+	terrain:FillBlock(CFrame.new(0, -2, -25), Vector3.new(170, 4, 50), Enum.Material.Cobblestone)
+	hillsAround(Vector3.zero, 230, 230, Enum.Material.Rock, rng)
 	for _, side in { -1, 1 } do
-		block(lobby, "Wall", Vector3.new(4, 30, 220), CFrame.new(side * 112, 15, 0), Color3.fromRGB(24, 26, 30), Enum.Material.Concrete)
-		block(lobby, "Wall", Vector3.new(228, 30, 4), CFrame.new(0, 15, side * 112), Color3.fromRGB(24, 26, 30), Enum.Material.Concrete)
+		barrier(lobby, Vector3.new(4, 60, 236), CFrame.new(side * 116, 30, 0))
+		barrier(lobby, Vector3.new(236, 60, 4), CFrame.new(0, 30, side * 116))
 	end
 
 	local spawn = Instance.new("SpawnLocation")
 	spawn.Name = "LobbySpawn"
 	spawn.Anchored = true
-	spawn.Size = Vector3.new(12, 1, 12)
-	spawn.CFrame = CFrame.new(0, 0.5, 60)
-	spawn.Color = Color3.fromRGB(0, 255, 140)
+	spawn.Size = Vector3.new(12, 0.6, 12)
+	spawn.CFrame = CFrame.new(0, 0.3, 60)
+	spawn.Color = if halloween then Color3.fromRGB(255, 120, 20) else Color3.fromRGB(0, 255, 140)
 	spawn.Material = Enum.Material.Neon
+	spawn.Transparency = 0.3
 	spawn.Duration = 0
 	spawn.Parent = lobby
 
 	-- Cartel
-	local sign = block(lobby, "Sign", Vector3.new(60, 16, 1), CFrame.new(0, 14, -100), Color3.fromRGB(15, 15, 18), Enum.Material.SmoothPlastic)
+	local sign = block(lobby, "Sign", Vector3.new(64, 20, 1.5), CFrame.new(0, 18, -100), Color3.fromRGB(15, 12, 18), Enum.Material.Slate)
+	block(lobby, "SignPost", Vector3.new(2, 10, 2), CFrame.new(-26, 4, -100), Color3.fromRGB(40, 30, 25), Enum.Material.Wood)
+	block(lobby, "SignPost", Vector3.new(2, 10, 2), CFrame.new(26, 4, -100), Color3.fromRGB(40, 30, 25), Enum.Material.Wood)
 	local sg = Instance.new("SurfaceGui")
 	sg.Face = Enum.NormalId.Back
-	sg.CanvasSize = Vector2.new(1200, 320)
+	sg.CanvasSize = Vector2.new(1280, 400)
+	sg.LightInfluence = 0
+	sg.Brightness = 2
 	local t = Instance.new("TextLabel")
-	t.Size = UDim2.fromScale(1, 1)
+	t.Size = UDim2.fromScale(1, 0.62)
 	t.BackgroundTransparency = 1
-	t.Font = Enum.Font.GothamBlack
+	t.Font = if halloween then Enum.Font.Creepster else Enum.Font.GothamBlack
 	t.TextScaled = true
-	t.TextColor3 = Color3.fromRGB(0, 255, 140)
-	t.Text = "SNIPER DUELS: ELITE"
+	t.TextColor3 = if halloween then Color3.fromRGB(255, 130, 20) else Color3.fromRGB(0, 255, 140)
+	t.Text = "SNIPER DUELS"
 	t.Parent = sg
+	local t2 = t:Clone()
+	t2.Position = UDim2.fromScale(0, 0.6)
+	t2.Size = UDim2.fromScale(1, 0.36)
+	t2.TextColor3 = if halloween then Color3.fromRGB(180, 90, 255) else Color3.new(1, 1, 1)
+	t2.Text = if halloween then "~ EDICIÓN HALLOWEEN ~" else "ELITE"
+	t2.Parent = sg
 	sg.Parent = sign
 
 	-- Pares de pads de duelo
 	for i = 1, 4 do
 		local x = -60 + (i - 1) * 40
-		local a = block(lobby, "PadA_" .. i, Vector3.new(8, 0.6, 8), CFrame.new(x, 0.3, -10), Color3.fromRGB(255, 70, 90), Enum.Material.Neon)
-		local b = block(lobby, "PadB_" .. i, Vector3.new(8, 0.6, 8), CFrame.new(x, 0.3, -40), Color3.fromRGB(80, 160, 255), Enum.Material.Neon)
-		block(lobby, "PadLink", Vector3.new(1, 0.2, 22), CFrame.new(x, 0.1, -25), Color3.fromRGB(60, 60, 70), Enum.Material.Metal)
+		local a = block(lobby, "PadA_" .. i, Vector3.new(8, 0.6, 8), CFrame.new(x, 0.3, -10), Color3.fromRGB(255, 110, 20), Enum.Material.Neon)
+		local b = block(lobby, "PadB_" .. i, Vector3.new(8, 0.6, 8), CFrame.new(x, 0.3, -40), Color3.fromRGB(160, 70, 255), Enum.Material.Neon)
+		block(lobby, "PadLink", Vector3.new(1, 0.2, 22), CFrame.new(x, 0.1, -25), Color3.fromRGB(50, 45, 55), Enum.Material.Metal)
+		if halloween then
+			Props.Pumpkin(lobby, CFrame.new(x + 6, 0, -10), 2.4, true)
+			Props.Pumpkin(lobby, CFrame.new(x - 6, 0, -40), 2.4, true)
+		else
+			Props.Lantern(lobby, CFrame.new(x + 6, 0, -25))
+		end
+	end
+
+	-- Decoración
+	if halloween then
+		Props.Pumpkin(lobby, CFrame.new(-70, 0, -80) * CFrame.Angles(0, math.rad(30), 0), 20, true)
+		Props.Pumpkin(lobby, CFrame.new(72, 0, -78) * CFrame.Angles(0, math.rad(-30), 0), 16, true)
+		for g = 0, 9 do
+			Props.Grave(lobby, CFrame.new(70 + (g % 5) * 5, 0, 30 + (g // 5) * 9), 1)
+		end
+		Props.Crypt(lobby, CFrame.new(82, 0, 62) * CFrame.Angles(0, math.rad(-90), 0))
+		Props.Cauldron(lobby, CFrame.new(-60, 0, 40))
+		for c = 0, 5 do
+			Props.Candle(lobby, CFrame.new(-60, 0, 40) * CFrame.Angles(0, c * math.rad(60), 0) * CFrame.new(0, 0, 4))
+		end
+		Props.Scarecrow(lobby, CFrame.new(-85, 0, 10))
+		Props.Fence(lobby, Vector3.new(60, 0, 20), Vector3.new(100, 0, 20))
+		Props.Web(lobby, CFrame.new(-25, 24, -99.2), 6)
+	end
+	for _ = 1, 9 do
+		local angle = rng:NextNumber(0, math.pi * 2)
+		local r = rng:NextNumber(85, 105)
+		Props.DeadTree(lobby, CFrame.new(math.cos(angle) * r, 0, math.sin(angle) * r), rng:NextNumber(22, 36), rng)
+	end
+	for z = 70, -50, -30 do
+		Props.Lantern(lobby, CFrame.new(-10, 0, z))
+		Props.Lantern(lobby, CFrame.new(10, 0, z) * CFrame.Angles(0, math.rad(180), 0))
 	end
 
 	lobby.Parent = workspace
@@ -227,19 +432,7 @@ local function buildLobby(): Model
 end
 
 function ArenaService.Start()
-	-- Iluminación ambiente
-	local atmo = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
-	atmo.Density = 0.28
-	atmo.Haze = 1.2
-	atmo.Color = Color3.fromRGB(200, 190, 180)
-	atmo.Parent = Lighting
-	if not Lighting:FindFirstChildOfClass("BloomEffect") then
-		local bloom = Instance.new("BloomEffect")
-		bloom.Intensity = 0.6
-		bloom.Size = 30
-		bloom.Threshold = 1.6
-		bloom.Parent = Lighting
-	end
+	Environment.Apply()
 
 	local lobby = workspace:FindFirstChild("Lobby") :: Model?
 	if not lobby then
@@ -282,18 +475,18 @@ function ArenaService.Start()
 	else
 		local f = Instance.new("Folder")
 		f.Name = "Arenas"
+		f.Parent = workspace
 		for idx = 1, GameConfig.ArenaCount do
 			local origin = GameConfig.ArenaOrigin + Vector3.new((idx - 1) * GameConfig.ArenaSpacing, 0, 0)
 			local arena = buildArena(idx, origin)
 			arena.Model.Parent = f
 			table.insert(arenas, arena)
+			task.wait() -- repartir la generación en varios frames
 		end
-		f.Parent = workspace
 	end
 end
 
 function ArenaService.Acquire(): Arena?
-	-- Elegir una arena libre al azar para variar mapas
 	local free = {}
 	for _, a in arenas do
 		if not a.InUse then

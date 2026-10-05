@@ -22,6 +22,9 @@ local DataService = require(script.Parent.DataService)
 
 export type KillInfo = { Headshot: boolean, Distance: number, WeaponId: string }
 
+-- Un "combatiente" es un Player o un bot (tabla con Character, DisplayName, IsBot)
+type Combatant = any
+
 type State = {
 	WeaponId: string,
 	SkinId: string,
@@ -33,7 +36,7 @@ type State = {
 }
 
 type Bullet = {
-	Shooter: Player,
+	Shooter: Combatant,
 	Origin: Vector3,
 	Velocity: Vector3,
 	Gravity: number,
@@ -41,19 +44,24 @@ type Bullet = {
 	T: number,
 	MaxT: number,
 	Weapon: Weapons.Weapon,
-	Targets: { Player },
+	Targets: { Combatant },
 	Params: RaycastParams,
 }
 
 local CombatService = {}
-CombatService.Killed = Signal.new() -- (killer, victim, KillInfo)
+CombatService.Killed = Signal.new() -- (killer, victim, KillInfo); pueden ser bots
 
 -- DuelService reemplaza esto para decir a quién puede dañar cada jugador.
-CombatService.TargetResolver = function(_player: Player): { Player }
+CombatService.TargetResolver = function(_c: Combatant): { Combatant }
 	return {}
 end
 
-local states: { [Player]: State } = {}
+local states: { [Combatant]: State } = {}
+
+local function isPlayer(c: Combatant): boolean
+	return typeof(c) == "Instance" and c:IsA("Player")
+end
+CombatService.IsPlayer = isPlayer
 local bullets: { Bullet } = {}
 
 local function isFiniteVector(v: any): boolean
@@ -68,9 +76,9 @@ local function isFiniteVector(v: any): boolean
 	return true
 end
 
-local function pushAmmo(player: Player)
+local function pushAmmo(player: Combatant)
 	local s = states[player]
-	if s then
+	if s and isPlayer(player) then
 		Net.Event("AmmoUpdate"):FireClient(player, s.Mag, s.Reloading, s.WeaponId)
 	end
 end
@@ -91,7 +99,7 @@ local function poseArms(character: Model, raised: boolean)
 	end
 end
 
-local function attachGun(player: Player)
+local function attachGun(player: Combatant)
 	local character = player.Character
 	local s = states[player]
 	if not character or not s then
@@ -115,10 +123,10 @@ local function attachGun(player: Player)
 	poseArms(character, true)
 end
 
-function CombatService.Arm(player: Player)
-	local data = DataService.Get(player)
-	local weaponId = data and data.Equipped.Weapon or Weapons.Default
-	local skinId = data and data.Equipped.Skin or "Default"
+function CombatService.Arm(player: Combatant, weaponOverride: string?, skinOverride: string?)
+	local data = if isPlayer(player) then DataService.Get(player) else nil
+	local weaponId = weaponOverride or (data and data.Equipped.Weapon) or Weapons.Default
+	local skinId = skinOverride or (data and data.Equipped.Skin) or "Default"
 	local w = Weapons.Get(weaponId)
 	local prev = states[player]
 	states[player] = {
@@ -135,7 +143,7 @@ function CombatService.Arm(player: Player)
 	pushAmmo(player)
 end
 
-function CombatService.Disarm(player: Player)
+function CombatService.Disarm(player: Combatant)
 	states[player] = nil
 	HitboxHistory.Untrack(player)
 	local character = player.Character
@@ -147,10 +155,12 @@ function CombatService.Disarm(player: Player)
 		character:SetAttribute("Scoped", false)
 		poseArms(character, false)
 	end
-	Net.Event("AmmoUpdate"):FireClient(player, -1, false, "")
+	if isPlayer(player) then
+		Net.Event("AmmoUpdate"):FireClient(player, -1, false, "")
+	end
 end
 
-function CombatService.SetCanFire(player: Player, canFire: boolean)
+function CombatService.SetCanFire(player: Combatant, canFire: boolean)
 	local s = states[player]
 	if s then
 		s.CanFire = canFire
@@ -158,7 +168,7 @@ function CombatService.SetCanFire(player: Player, canFire: boolean)
 end
 
 -- Recarga instantánea entre rondas + reponer arma al nuevo personaje
-function CombatService.ResetForRound(player: Player)
+function CombatService.ResetForRound(player: Combatant)
 	local s = states[player]
 	if not s then
 		return
@@ -173,7 +183,7 @@ function CombatService.ResetForRound(player: Player)
 	pushAmmo(player)
 end
 
-local function applyHit(bullet: Bullet, victim: Player, zone: string, position: Vector3)
+local function applyHit(bullet: Bullet, victim: Combatant, zone: string, position: Vector3)
 	local shooter = bullet.Shooter
 	local w = bullet.Weapon
 	local humanoid = victim.Character and victim.Character:FindFirstChildOfClass("Humanoid")
@@ -191,14 +201,18 @@ local function applyHit(bullet: Bullet, victim: Player, zone: string, position: 
 	local killed = humanoid.Health - damage <= 0
 	humanoid.Health = math.max(humanoid.Health - damage, 0)
 
-	local data = DataService.Get(shooter)
+	local data = if isPlayer(shooter) then DataService.Get(shooter) else nil
 	if data then
 		data.ShotsHit += 1
 	end
 
 	local studs = math.floor(distance)
-	Net.Event("HitConfirm"):FireClient(shooter, zone, damage, killed, studs)
-	Net.Event("Damaged"):FireClient(victim, bullet.Origin, damage, humanoid.Health)
+	if isPlayer(shooter) then
+		Net.Event("HitConfirm"):FireClient(shooter, zone, damage, killed, studs)
+	end
+	if isPlayer(victim) then
+		Net.Event("Damaged"):FireClient(victim, bullet.Origin, damage, humanoid.Health)
+	end
 
 	if killed then
 		if data then
@@ -208,7 +222,7 @@ local function applyHit(bullet: Bullet, victim: Player, zone: string, position: 
 			end
 			data.LongestShot = math.max(data.LongestShot, studs)
 		end
-		local vdata = DataService.Get(victim)
+		local vdata = if isPlayer(victim) then DataService.Get(victim) else nil
 		if vdata then
 			vdata.Deaths += 1
 		end
@@ -233,7 +247,7 @@ local function stepBullet(b: Bullet, targetT: number): boolean
 
 		-- Instante que el tirador veía para esta parte del vuelo
 		local sampleT = math.min(b.ShotTime + t1 - GameConfig.ViewInterpolationDelay, now)
-		local bestFrac, bestVictim, bestZone = math.huge, nil :: Player?, ""
+		local bestFrac, bestVictim, bestZone = math.huge, nil :: Combatant?, ""
 		for _, target in b.Targets do
 			local boxes = HitboxHistory.Sample(target, sampleT)
 			if boxes then
@@ -261,7 +275,7 @@ local function stepBullet(b: Bullet, targetT: number): boolean
 	return false
 end
 
-local function onFire(player: Player, origin: any, direction: any, shotTime: any)
+local function fireShot(player: Combatant, origin: any, direction: any, shotTime: any)
 	local s = states[player]
 	if not s or not s.CanFire or s.Reloading or s.Mag <= 0 then
 		return
@@ -289,7 +303,7 @@ local function onFire(player: Player, origin: any, direction: any, shotTime: any
 
 	s.LastFire = clock
 	s.Mag -= 1
-	local data = DataService.Get(player)
+	local data = if isPlayer(player) then DataService.Get(player) else nil
 	if data then
 		data.ShotsFired += 1
 	end
@@ -300,17 +314,22 @@ local function onFire(player: Player, origin: any, direction: any, shotTime: any
 
 	local targets = CombatService.TargetResolver(player)
 
-	-- Efectos para todos los que puedan verlo (rivales + espectadores del duelo)
+	-- Efectos para todos los que puedan verlo (el cliente descarta lo lejano)
 	for _, other in Players:GetPlayers() do
 		if other ~= player then
-			Net.Event("ShotFx"):FireClient(other, player, origin, direction.Unit, s.WeaponId, s.SkinId)
+			Net.Event("ShotFx"):FireClient(other, character, origin, direction.Unit, s.WeaponId, s.SkinId)
 		end
 	end
 
-	local exclude = {}
+	local exclude: { Instance } = {}
 	for _, p in Players:GetPlayers() do
 		if p.Character then
 			table.insert(exclude, p.Character)
+		end
+	end
+	for c in states do
+		if not isPlayer(c) and c.Character then
+			table.insert(exclude, c.Character)
 		end
 	end
 	local params = RaycastParams.new()
@@ -336,7 +355,22 @@ local function onFire(player: Player, origin: any, direction: any, shotTime: any
 	end
 end
 
-local function onReload(player: Player)
+local function onFire(player: Player, origin: any, direction: any, shotTime: any)
+	fireShot(player, origin, direction, shotTime)
+end
+
+-- Disparo de un bot: mismas reglas (munición, cadencia, origen) que un jugador
+function CombatService.BotFire(bot: Combatant, origin: Vector3, direction: Vector3)
+	fireShot(bot, origin, direction, workspace:GetServerTimeNow())
+end
+
+function CombatService.SetScoped(c: Combatant, scoped: boolean)
+	if c.Character and states[c] then
+		c.Character:SetAttribute("Scoped", scoped)
+	end
+end
+
+local function onReload(player: Combatant)
 	local s = states[player]
 	if not s or s.Reloading then
 		return
@@ -376,14 +410,17 @@ function CombatService.Start()
 		local now = workspace:GetServerTimeNow()
 		for i = #bullets, 1, -1 do
 			local b = bullets[i]
-			if not b.Shooter.Parent or stepBullet(b, now - b.ShotTime) then
+			local gone = if isPlayer(b.Shooter) then b.Shooter.Parent == nil else not b.Shooter.Active
+			if gone or stepBullet(b, now - b.ShotTime) then
 				table.remove(bullets, i)
 			end
 		end
 	end)
 end
 
-function CombatService.GetState(player: Player)
+CombatService.Reload = onReload
+
+function CombatService.GetState(player: Combatant)
 	return states[player]
 end
 

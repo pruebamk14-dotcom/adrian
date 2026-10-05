@@ -3,20 +3,28 @@
 
 local Make = {}
 
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local GameConfig = require(ReplicatedStorage:WaitForChild("Shared").Config.GameConfig)
+local halloween = GameConfig.HalloweenEvent
+
 Make.Theme = {
-	Bg = Color3.fromRGB(14, 15, 19),
-	Panel = Color3.fromRGB(24, 26, 33),
-	PanelLight = Color3.fromRGB(36, 39, 49),
-	Stroke = Color3.fromRGB(60, 64, 78),
-	Text = Color3.fromRGB(236, 238, 244),
-	SubText = Color3.fromRGB(150, 156, 172),
-	Accent = Color3.fromRGB(0, 255, 140),
+	Bg = if halloween then Color3.fromRGB(16, 11, 20) else Color3.fromRGB(14, 15, 19),
+	Panel = if halloween then Color3.fromRGB(28, 20, 34) else Color3.fromRGB(24, 26, 33),
+	PanelLight = if halloween then Color3.fromRGB(46, 33, 54) else Color3.fromRGB(36, 39, 49),
+	Stroke = if halloween then Color3.fromRGB(90, 60, 110) else Color3.fromRGB(60, 64, 78),
+	Text = Color3.fromRGB(240, 236, 244),
+	SubText = if halloween then Color3.fromRGB(170, 150, 180) else Color3.fromRGB(150, 156, 172),
+	Accent = if halloween then Color3.fromRGB(255, 130, 20) else Color3.fromRGB(0, 255, 140),
+	Purple = Color3.fromRGB(170, 80, 255),
 	Danger = Color3.fromRGB(255, 70, 90),
 	Gold = Color3.fromRGB(255, 200, 60),
 	Blue = Color3.fromRGB(80, 160, 255),
+	Candy = Color3.fromRGB(255, 120, 200),
 	Font = Enum.Font.GothamBold,
 	FontBlack = Enum.Font.GothamBlack,
 	FontMedium = Enum.Font.GothamMedium,
+	FontTitle = if halloween then Enum.Font.Creepster else Enum.Font.GothamBlack,
+	Halloween = halloween,
 }
 
 function Make.new(className: string, props: { [string]: any }?, children: { Instance }?): any
