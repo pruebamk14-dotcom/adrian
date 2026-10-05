@@ -21,6 +21,16 @@ Todo está escrito en **Luau** y se sincroniza con **Rojo**. No necesita assets 
 
 ## Novedades de la última versión
 
+- **Sala de espera** en el lobby: cuadrados de **DUELO 1v1**, **DUELO 2v2** (dos por equipo) y **VS BOT** (al pisarlo se abre el menú de dificultad).
+- **Modo 2v2** real: equipos, gana la ronda el equipo que elimina a todos los rivales; si alguien se va, el duelo sigue.
+- **Inspeccionar** armas y skins en una sala 3D (botón 👁 en Arsenal y Tienda; al abrir una caja te enseña la skin). Arrastrar para girar, rueda para acercar, **M** para salir.
+- **Skins con dibujo**: camuflaje, rayas, puntos y llamas pintados sobre el arma (no solo colores lisos).
+- **Deslizamiento** con fuerza física (ya no lo frena el Humanoid) y la cámara baja al agacharte o deslizarte.
+- **Menú (M)**: el ratón ya se libera en primera persona para poder pulsar los botones.
+- **Mira estable**: el vaivén y el retroceso se aplican al arma y a la retícula en vez de pelear con la cámara.
+- La línea de estado del duelo muestra el resultado de cada disparo (impacto o por cuánto fallas).
+- Las skins y armas se pueden cambiar en mitad de un duelo; `:weapons me` y `:skins me` las equipan al momento.
+
 - **Cuchillo mariposa** en la ranura 2 (tecla 2 o Q): una cuchillada a corta distancia elimina; en reposo hace el giro de mariposa. Se corre más rápido con él.
 - **Agacharse y deslizarse** (C o Ctrl; corriendo con Shift + C te deslizas como en Call of Duty). Agachado dispersas menos.
 - **Menú con M** (y botón ☰): continuar, sensibilidad, mira por pulsación o alternar, abandonar el duelo.

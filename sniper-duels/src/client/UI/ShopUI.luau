@@ -20,6 +20,7 @@ local Net = require(Shared.Net)
 
 local ClientState = require(script.Parent.Parent.ClientState)
 local Make = require(script.Parent.Make)
+local InspectUI = require(script.Parent.InspectUI)
 
 local T = Make.Theme
 local new = Make.new
@@ -268,6 +269,10 @@ local function buildWeapons()
 			ribbon(card, "TIENDA", T.Purple)
 		end
 		weaponViewport(card, id, if w.Exclusive then "Headless" else "Default", UDim2.new(1, 0, 0, 130), UDim2.fromOffset(0, 18))
+		Make.Button("👁 INSPECCIONAR", Color3.fromRGB(30, 22, 36), { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -10, 0, 120), Size = UDim2.fromOffset(130, 26), TextSize = 12, ZIndex = 7, Parent = card }, function()
+			ShopUI.Close()
+			InspectUI.Open("Rifle", id, if w.Exclusive then "Headless" else "Default")
+		end)
 		local name = Make.Label(w.DisplayName, { Position = UDim2.fromOffset(16, 148), Size = UDim2.new(1, -32, 0, 26), TextXAlignment = Enum.TextXAlignment.Left, Font = T.FontBlack, TextSize = 22, ZIndex = 5, Parent = card })
 		if w.Exclusive then
 			new("UIGradient", { Color = GOLD_GRAD, Parent = name })
@@ -425,6 +430,15 @@ local function buildCrates()
 		local currency = if res.Currency == "Candies" then "caramelos" else "monedas"
 		result.Text = if res.Duplicate then string.format("%s (duplicado) · +%d %s", s.DisplayName, res.Refund, currency) else string.format("¡%s %s!", s.Rarity, s.DisplayName)
 		result.TextColor3 = rarity.Color
+		-- Como en el original: enseñar la skin conseguida en la sala de inspección
+		local wonSkin = res.SkinId
+		task.delay(1.2, function()
+			if root.Visible then
+				ShopUI.Close()
+				local d = ClientState.Data
+				InspectUI.Open("Rifle", d and d.Equipped and d.Equipped.Weapon or "Intervention", wonSkin)
+			end
+		end)
 		-- Destello de rareza
 		local flash = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = rarity.Color, BackgroundTransparency = 0.4, ZIndex = 6, Parent = reel })
 		tween(flash, 0.8, { BackgroundTransparency = 1 })

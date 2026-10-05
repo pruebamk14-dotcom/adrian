@@ -228,6 +228,11 @@ local function fire()
 		origin = head.Position
 		aimDir = (target - origin).Unit
 	end
+	-- El vaivén de la mira desvía el tiro igual que mueve la retícula
+	local sway = ClientState.Sway or Vector2.zero
+	if ClientState.Scoped and (sway.X ~= 0 or sway.Y ~= 0) then
+		aimDir = (CFrame.lookAt(Vector3.zero, aimDir) * CFrame.Angles(math.rad(sway.Y), math.rad(sway.X), 0)).LookVector
+	end
 	local direction = Ballistics.ApplySpread(aimDir, spread, rng)
 	Net.Event("Fire"):FireServer(origin, direction, workspace:GetServerTimeNow())
 
@@ -250,6 +255,10 @@ local function fire()
 	EffectsController.PlaySound("Fire", 0.9)
 
 	recoilVel += weapon.RecoilPitch * 18
+	-- Golpe de cámara único (si el script de cámara lo conserva, se nota; si no, no molesta)
+	pcall(function()
+		camera.CFrame = camera.CFrame * CFrame.Angles(math.rad(weapon.RecoilPitch * (if ClientState.Scoped then 0.25 else 0.5)), math.rad(rng:NextNumber(-0.3, 0.3)), 0)
+	end)
 	if weapon.FireCooldown < 0.8 then
 		ejectShell()
 	end
@@ -312,6 +321,9 @@ end
 
 -- Postura ------------------------------------------------------------------------
 
+local slideForce: LinearVelocity? = nil
+local cameraDrop = 0 -- bajada actual de la cámara (suavizada)
+
 local function setCrouch(on: boolean)
 	local hum = humanoid()
 	if not hum then
@@ -321,8 +333,43 @@ local function setCrouch(on: boolean)
 		baseHip = hum.HipHeight
 	end
 	crouched = on
-	hum.HipHeight = if on then math.max((baseHip :: number) - GameConfig.CrouchHipDrop, 0.2) else (baseHip :: number)
+	-- Bajar un poco la cadera (y la hitbox con ella) sin hundir las piernas
+	hum.HipHeight = if on then math.max((baseHip :: number) - GameConfig.CrouchHipDrop * 0.5, 0.2) else (baseHip :: number)
 	ClientState.Crouched = on
+end
+
+local function stopSlide()
+	sliding = false
+	if slideForce then
+		local att = slideForce.Attachment0
+		slideForce:Destroy()
+		if att then
+			att:Destroy()
+		end
+		slideForce = nil
+	end
+end
+
+local function startSlide(root: BasePart, dir: Vector3)
+	stopSlide()
+	sliding = true
+	slideEnd = os.clock() + GameConfig.SlideDuration
+	slideDir = dir
+	-- Fuerza física: el Humanoid no puede "frenarla" como hacía con la velocidad
+	local att = Instance.new("Attachment")
+	att.Name = "SD_SlideAttachment"
+	att.Parent = root
+	local lv = Instance.new("LinearVelocity")
+	lv.Name = "SD_Slide"
+	lv.Attachment0 = att
+	lv.RelativeTo = Enum.ActuatorRelativeTo.World
+	lv.VelocityConstraintMode = Enum.VelocityConstraintMode.Plane
+	lv.PrimaryTangentAxis = Vector3.new(1, 0, 0)
+	lv.SecondaryTangentAxis = Vector3.new(0, 0, 1)
+	lv.MaxForce = 60000
+	lv.PlaneVelocity = Vector2.new(dir.X, dir.Z) * GameConfig.SlideSpeed
+	lv.Parent = root
+	slideForce = lv
 end
 
 local function tryCrouchOrSlide()
@@ -334,10 +381,11 @@ local function tryCrouchOrSlide()
 	local vel = root.AssemblyLinearVelocity
 	local planar = Vector3.new(vel.X, 0, vel.Z)
 	-- Corriendo (sprint) + agacharse = deslizarse tipo Call of Duty
-	if sprinting and not crouched and planar.Magnitude > WALK_SPEED * 0.9 and hum.FloorMaterial ~= Enum.Material.Air then
-		sliding = true
-		slideEnd = os.clock() + GameConfig.SlideDuration
-		slideDir = planar.Unit
+	-- Si va corriendo hacia algún lado (aunque la velocidad aún no sea máxima)
+	local moveDir = hum.MoveDirection
+	local dir = if planar.Magnitude > 4 then planar.Unit elseif moveDir.Magnitude > 0.1 then Vector3.new(moveDir.X, 0, moveDir.Z).Unit else nil
+	if sprinting and not crouched and dir and hum.FloorMaterial ~= Enum.Material.Air then
+		startSlide(root, dir)
 		setCrouch(true)
 		EffectsController.Shake(0.4)
 		EffectsController.PlaySound("Slide", 0.6)
@@ -394,10 +442,15 @@ local function onArmedChanged()
 		scopeBlur.Size = 0
 		recoil, recoilVel = 0, 0
 		appliedPitch, appliedYaw, appliedRoll = 0, 0, 0
-		sliding = false
+		stopSlide()
 		if crouched then
 			setCrouch(false)
 		end
+		local h = humanoid()
+		if h then
+			h.CameraOffset = Vector3.zero
+		end
+		cameraDrop = 0
 		releaseCamera()
 		pcall(function()
 			UserInputService.MouseIconEnabled = true
@@ -643,13 +696,20 @@ local function update(dt: number)
 	-- Deslizamiento
 	local root = hum and hum.RootPart
 	if sliding then
-		if os.clock() >= slideEnd or not root or (hum and hum.FloorMaterial == Enum.Material.Air) then
-			sliding = false
-		elseif root then
+		if os.clock() >= slideEnd or not root then
+			stopSlide()
+		elseif slideForce then
+			-- Frena de forma progresiva hasta el final del deslizamiento
 			local remaining = (slideEnd - os.clock()) / GameConfig.SlideDuration
-			local speed = GameConfig.SlideSpeed * (0.35 + 0.65 * remaining)
-			root.AssemblyLinearVelocity = Vector3.new(slideDir.X * speed, root.AssemblyLinearVelocity.Y, slideDir.Z * speed)
+			local speed = GameConfig.SlideSpeed * (0.3 + 0.7 * remaining)
+			slideForce.PlaneVelocity = Vector2.new(slideDir.X, slideDir.Z) * speed
 		end
+	end
+	-- Cámara: baja al agacharse/deslizarse (más al deslizarse)
+	if hum then
+		local target = if sliding then -2.2 elseif crouched then -1.4 else 0
+		cameraDrop += (target - cameraDrop) * math.clamp(dt * 12, 0, 1)
+		hum.CameraOffset = Vector3.new(0, cameraDrop, 0)
 	end
 
 	-- Velocidad de movimiento
@@ -677,15 +737,16 @@ local function update(dt: number)
 	recoilVel += accel * dt
 	recoil += recoilVel * dt
 
-	-- Sway de la mira (se reduce al aguantar la respiración) + inclinación al deslizar
+	-- Sway de la mira: NO se toca la cámara cada frame (pelea con el script de
+	-- cámara de Roblox y da saltos). El vaivén se aplica a la retícula y al
+	-- viewmodel; el servidor/cliente lo tienen en cuenta en la dispersión.
 	local t = os.clock()
 	local swayAmt = weapon.Sway * (if breathing then 0.12 elseif exhausted then 2.2 else 1) * ClientState.ScopeProgress
 	local sx = (math.noise(t * 0.45, 0, 1.3) * 2 + math.sin(t * 1.1) * 0.6) * swayAmt
 	local sy = (math.noise(0, t * 0.45, 7.7) * 2 + math.sin(t * 0.8) * 0.4) * swayAmt
-	local pitch, yaw = sy + recoil * 0.35, sx
-	local roll = if sliding then -6 else 0
-	camera.CFrame = camera.CFrame * CFrame.Angles(math.rad(pitch - appliedPitch), math.rad(yaw - appliedYaw), math.rad(roll - appliedRoll))
-	appliedPitch, appliedYaw, appliedRoll = pitch, yaw, roll
+	ClientState.Sway = Vector2.new(sx, sy)
+	ClientState.Recoil = recoil
+	local _ = appliedPitch
 
 	local planar = if root then Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z).Magnitude else 0
 
@@ -730,7 +791,10 @@ local function update(dt: number)
 			local slidePose = if sliding then CFrame.Angles(math.rad(8), math.rad(-12), math.rad(-8)) else CFrame.identity
 			local base = hip:Lerp(ads, eased)
 			local kick = CFrame.new(0, 0, recoil * 0.04) * CFrame.Angles(math.rad(recoil * 0.8), 0, 0)
-			vm:PivotTo(camera.CFrame * base * sprintPose * reloadPose * slidePose * swayOffset * bob * kick)
+			local shakeV = ClientState.ShakeOffset or Vector3.zero
+			local shakeCf = CFrame.new(shakeV.X * 0.02, shakeV.Y * 0.02, 0) * CFrame.Angles(math.rad(shakeV.Y * 0.4), math.rad(shakeV.X * 0.4), 0)
+			local aimSway = CFrame.Angles(math.rad(sy * 0.3), math.rad(sx * 0.3), 0)
+			vm:PivotTo(camera.CFrame * base * sprintPose * reloadPose * slidePose * swayOffset * aimSway * bob * kick * shakeCf)
 		end
 		for _, part in vm:GetDescendants() do
 			if part:IsA("BasePart") then
@@ -808,7 +872,9 @@ function WeaponController.Start()
 	player.CharacterAdded:Connect(function()
 		baseHip = nil
 		crouched = false
+		slideForce = nil
 		sliding = false
+		cameraDrop = 0
 		if ClientState.Armed then
 			task.defer(function()
 				forceFirstPerson()

@@ -369,7 +369,7 @@ local function onDuelState(state: any)
 	ClientState.DuelChanged:Fire(state)
 
 	refs.Top.Visible = state.State ~= "Ended"
-	refs.Me.Label.Text = player.DisplayName
+	refs.Me.Label.Text = player.DisplayName .. (if state.AllyNames and state.AllyNames ~= "" then " & " .. state.AllyNames else "")
 	refs.Opp.Label.Text = state.OpponentName .. (if string.find(state.OpponentName, "Práctica") then " (no dispara)" else "")
 	setPips(refs.Me, state.MyScore, state.RoundsToWin)
 	setPips(refs.Opp, state.OppScore, state.RoundsToWin)
@@ -381,7 +381,8 @@ local function onDuelState(state: any)
 		refs.VSOpp.Text = state.OpponentName
 		refs.VSMeSub.Text = string.format("%s · %d", Rank.FromElo(myElo).Name, myElo)
 		refs.VSOppSub.Text = if state.OpponentIsBot then "BOT · IA" else string.format("%s · %d", Rank.FromElo(state.OpponentElo or 1000).Name, state.OpponentElo or 1000)
-		refs.VSArena.Text = string.format("%s  ·  Mapa: %s  ·  Primero a %d", if state.Ranked then "RANKED" elseif state.VsBot then "MODO SOLO" else "CASUAL", state.Arena, state.RoundsToWin)
+		refs.VSMe.Text = player.DisplayName .. (if state.AllyNames and state.AllyNames ~= "" then " & " .. state.AllyNames else "")
+		refs.VSArena.Text = string.format("%s  ·  Mapa: %s  ·  Primero a %d", if state.Ranked then "RANKED" elseif state.VsBot then "MODO SOLO" elseif state.Mode == "2v2" then "2v2" else "CASUAL", state.Arena, state.RoundsToWin)
 		refs.VS.Visible = true
 		refs.VS.BackgroundTransparency = 1
 		tween(refs.VS, 0.4, { BackgroundTransparency = 0.25 })
@@ -470,9 +471,17 @@ local function update()
 
 	refs.Slots.Visible = armed
 	refs.Hint.Visible = armed
+	-- Vaivén y temblor sobre la retícula (en vez de sobre la cámara)
+	local sway = ClientState.Sway or Vector2.zero
+	local shk = ClientState.ShakeOffset or Vector3.zero
+	local px = (camera.ViewportSize.Y / 2) / math.tan(math.rad(camera.FieldOfView / 2))
+	local ox = math.tan(math.rad(sway.X)) * px + shk.X * 6
+	local oy = -math.tan(math.rad(sway.Y)) * px + shk.Y * 6
+	refs.Scope.Position = UDim2.new(0, ox, 0, oy)
+	refs.Crosshair.Position = UDim2.new(0.5, ox * 0.3, 0.5, oy * 0.3)
 	-- Línea de estado (diagnóstico): si algo falla, una captura de esto basta
 	if duel then
-		refs.Status.Text = string.format("estado: %s · armado: %s · arma: %s · ranura: %d · mira: %s · cámara: %s · menú: %s", tostring(duel.State), if armed then "sí" else "NO", tostring(ClientState.WeaponId ~= "" and ClientState.WeaponId or player:GetAttribute("SD_Weapon") or "-"), ClientState.Slot, tostring(ClientState.Scoped), tostring(player.CameraMode), tostring(ClientState.MenuOpen))
+		refs.Status.Text = string.format("estado: %s · armado: %s · arma: %s · ranura: %d · mira: %s · menú: %s · último tiro: %s", tostring(duel.State), if armed then "sí" else "NO", tostring(ClientState.WeaponId ~= "" and ClientState.WeaponId or player:GetAttribute("SD_Weapon") or "-"), ClientState.Slot, tostring(ClientState.Scoped), tostring(ClientState.MenuOpen), ClientState.LastShot ~= "" and ClientState.LastShot or "-")
 		refs.Status.Visible = true
 	else
 		refs.Status.Visible = false
@@ -536,6 +545,9 @@ function HUDController.Start()
 
 	Net.Event("DuelState").OnClientEvent:Connect(onDuelState)
 	Net.Event("HitConfirm").OnClientEvent:Connect(onHitConfirm)
+	Net.Event("ShotResult").OnClientEvent:Connect(function(text: string)
+		ClientState.LastShot = text
+	end)
 	Net.Event("Damaged").OnClientEvent:Connect(onDamaged)
 	Net.Event("KillFeed").OnClientEvent:Connect(addKillFeed)
 	Net.Event("Announce").OnClientEvent:Connect(function(from: string, msg: string)

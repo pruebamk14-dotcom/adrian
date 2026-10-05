@@ -368,8 +368,28 @@ if last and last.State == "Live" and bot2 and p1.Character then
 else
 	check("ronda nueva lista para probar el cuchillo", false, last and last.State or "?")
 end
--- Agacharse
+-- Deslizarse: correr (Shift) + C crea la fuerza de deslizamiento
 M.Run(4.5)
+do
+	local root = p1.Character and p1.Character:FindFirstChild("HumanoidRootPart")
+	if root then
+		root.Anchored = false
+		root.AssemblyLinearVelocity = Vector3.new(0, 0, -20)
+	end
+	M.FireAction("SD_Breath", Enum.UserInputState.Begin, Enum.UserInputType.Keyboard)
+	M.FireAction("SD_Crouch", Enum.UserInputState.Begin, Enum.UserInputType.Keyboard)
+	M.Run(0.1)
+	local lv = root and root:FindFirstChild("SD_Slide")
+	check("deslizarse crea la fuerza física", lv ~= nil and lv.ClassName == "LinearVelocity")
+	local hum0 = p1.Character:FindFirstChildOfClass("Humanoid")
+	check("la cámara baja al deslizarse", hum0 ~= nil and hum0.CameraOffset.Y < -0.3, hum0 and tostring(hum0.CameraOffset))
+	M.Run(1.2)
+	check("el deslizamiento termina solo", root ~= nil and root:FindFirstChild("SD_Slide") == nil)
+	M.FireAction("SD_Breath", Enum.UserInputState.End, Enum.UserInputType.Keyboard)
+	M.FireAction("SD_Crouch", Enum.UserInputState.Begin, Enum.UserInputType.Keyboard) -- levantarse
+	M.Run(0.3)
+end
+-- Agacharse
 local hum = p1.Character and p1.Character:FindFirstChildOfClass("Humanoid")
 local hipBefore = hum and hum.HipHeight or 0
 M.FireAction("SD_Crouch", Enum.UserInputState.Begin, Enum.UserInputType.Keyboard)
@@ -385,6 +405,33 @@ check("menú de pausa abierto", ClientState.MenuOpen == true and pg.Menu:FindFir
 M.FireAction("SD_Menu", Enum.UserInputState.Begin, Enum.UserInputType.Keyboard)
 M.Run(0.2)
 check("menú de pausa cerrado", ClientState.MenuOpen == false)
+-- Inspeccionar
+do
+	local InspectUI = M.Require.client(M.Unwrap(clientScript).UI.InspectUI)
+	InspectUI.Open("Rifle", "Intervention", "Woodland")
+	M.Run(0.3)
+	local insp = pg.Menu:FindFirstChild("Inspect")
+	check("inspeccionar abre la sala", insp ~= nil and insp.Visible == true)
+	local vp = insp and insp:FindFirstChildOfClass("ViewportFrame")
+	local gun = vp and vp:FindFirstChild("Rifle")
+	check("arma dentro de la sala", gun ~= nil)
+	local patterns = 0
+	if gun then
+		for _, d in gun:GetDescendants() do
+			if d:IsA("BasePart") and d:GetAttribute("SkinKind") == "Pattern" then
+				patterns += 1
+			end
+		end
+	end
+	check("la skin Woodland tiene dibujo de camuflaje", patterns > 5, tostring(patterns) .. " manchas")
+	M.FireAction("SD_InspectClose", Enum.UserInputState.Begin, Enum.UserInputType.Keyboard)
+	M.Run(0.2)
+	check("M cierra la inspección", insp ~= nil and insp.Visible == false)
+	InspectUI.Open("Knife", nil, "BlueCamo")
+	M.Run(0.2)
+	check("inspeccionar cuchillo", vp ~= nil and vp:FindFirstChild("Knife") ~= nil)
+	InspectUI.Close()
+end
 -- Recompensa diaria
 local daily = remotes.ClaimDaily:InvokeServer()
 check("recompensa diaria reclamada", daily ~= nil and daily.Ok == true and daily.Day == 1, daily and (daily.Error or tostring(daily.Coins)))
@@ -469,6 +516,55 @@ M.Run(6)
 check("vuelta al lobby (desarmado)", p1b:GetAttribute("SD_Weapon") == "", tostring(p1b:GetAttribute("SD_Weapon")))
 check("cámara vuelve a tercera persona", p1b.CameraMode == Enum.CameraMode.Classic)
 check("sin errores en el duelo de pads", #M.Errors == errorsBefore)
+
+-- DUELO 2v2 EN LOS PADS ---------------------------------------------------------------
+section("Duelo 2v2 en los pads")
+errorsBefore = #M.Errors
+local p3 = M.Wrap(M.AddPlayer("Compi", 3))
+local p4 = M.Wrap(M.AddPlayer("Rival1", 4))
+local p5 = M.Wrap(M.AddPlayer("Rival2", 5))
+M.Run(1.5)
+local quad = { lobby:FindFirstChild("Pad2A_1_1"), lobby:FindFirstChild("Pad2A_1_2"), lobby:FindFirstChild("Pad2B_1_1"), lobby:FindFirstChild("Pad2B_1_2") }
+check("pads 2v2 existen", quad[1] ~= nil and quad[4] ~= nil)
+local before2 = #duelStates
+for i, pl in { p1b, p3, p4, p5 } do
+	if quad[i] and pl.Character then
+		pl.Character:PivotTo(quad[i].CFrame + Vector3.new(0, 3, 0))
+	end
+end
+M.Run(4.5)
+last = duelStates[#duelStates]
+check("duelo 2v2 iniciado", #duelStates > before2 and last and last.Mode == "2v2", last and tostring(last.Mode))
+check("compañero en el equipo", last and last.AllyNames == "Compi", last and tostring(last.AllyNames))
+check("dos rivales", last and last.OpponentName == "Rival1 & Rival2", last and tostring(last.OpponentName))
+M.Run(8)
+last = duelStates[#duelStates]
+check("2v2 en Live con todos armados", last and last.State == "Live" and p3:GetAttribute("SD_Weapon") ~= "" and p5:GetAttribute("SD_Weapon") ~= "", last and last.State)
+-- Un rival se va: el duelo sigue 2v1
+M.RemovePlayer(p4)
+M.Run(1)
+last = duelStates[#duelStates]
+check("sigue el duelo tras irse un rival", last and last.State ~= "Ended" and last.OpponentName == "Rival2", last and (last.State .. " " .. tostring(last.OpponentName)))
+-- Yo abandono: mi compañero sigue solo
+remotes.LeaveDuel:FireServer()
+M.Run(1)
+check("tras abandonar, desarmado", p1b:GetAttribute("SD_Weapon") == "", tostring(p1b:GetAttribute("SD_Weapon")))
+M.RemovePlayer(p3)
+M.Run(7)
+check("sin errores en el 2v2", #M.Errors == errorsBefore)
+
+-- PAD DE BOT -----------------------------------------------------------------------------
+section("Pad de BOT")
+errorsBefore = #M.Errors
+local botPad = lobby:FindFirstChild("BotPad")
+check("pad de bot existe", botPad ~= nil)
+local menuGui = pg.Menu
+if botPad and p1b.Character then
+	p1b.Character:PivotTo(botPad.CFrame + Vector3.new(0, 3, 0))
+end
+M.Run(1)
+check("subirse al pad abre el menú de bot", menuGui:FindFirstChild("Bot") ~= nil and menuGui.Bot.Visible == true)
+check("sin errores en el pad de bot", #M.Errors == errorsBefore)
 
 end
 local okMain, errMain = xpcall(main, M.Traceback)

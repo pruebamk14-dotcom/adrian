@@ -41,12 +41,12 @@ local function leaveQueue(player: Player)
 	end
 end
 
-local function playerOnPad(pad: BasePart): Player?
+local function playerOnPad(pad: BasePart, taken: { [Player]: boolean }?): Player?
 	local padPos = pad.Position
 	for _, p in Players:GetPlayers() do
 		local root = p.Character and p.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 		local hum = p.Character and p.Character:FindFirstChildOfClass("Humanoid")
-		if root and hum and hum.Health > 0 then
+		if root and hum and hum.Health > 0 and not (taken and taken[p]) then
 			local d = root.Position - padPos
 			if Vector2.new(d.X, d.Z).Magnitude <= GameConfig.PadRadius and d.Y > -1 and d.Y < 8 then
 				if not DuelService.IsBusy(p) and not queueIndex(p) then
@@ -58,34 +58,64 @@ local function playerOnPad(pad: BasePart): Player?
 	return nil
 end
 
+local groupTimers: { [number]: number? } = {}
+local botPadLast: { [Player]: number } = {}
+
 local function updatePads()
-	for _, pair in ArenaService.PadPairs() do
-		local a = playerOnPad(pair.A)
-		local b = playerOnPad(pair.B)
-		if a and b and a ~= b then
-			local started = padTimers[pair.Id]
+	for _, group in ArenaService.PadGroups() do
+		local taken: { [Player]: boolean } = {}
+		local teamA, teamB = {}, {}
+		local filled = 0
+		for _, pad in group.A do
+			local p = playerOnPad(pad, taken)
+			if p then
+				taken[p] = true
+				table.insert(teamA, p)
+				filled += 1
+			end
+		end
+		for _, pad in group.B do
+			local p = playerOnPad(pad, taken)
+			if p then
+				taken[p] = true
+				table.insert(teamB, p)
+				filled += 1
+			end
+		end
+		local needed = #group.A + #group.B
+		if filled == needed then
+			local started = groupTimers[group.Id]
 			if not started then
-				padTimers[pair.Id] = os.clock()
+				groupTimers[group.Id] = os.clock()
 				started = os.clock()
 			end
 			local remaining = GameConfig.PadCountdown - (os.clock() - (started :: number))
 			if remaining <= 0 then
-				if DuelService.StartDuel(a, b, false) then
-					padTimers[pair.Id] = nil
-					pair.Label.Text = "DUELO 1v1"
+				if DuelService.StartTeams(teamA, teamB, false) then
+					groupTimers[group.Id] = nil
+					group.Label.Text = "DUELO " .. group.Mode
 				else
-					pair.Label.Text = "Arenas llenas..."
+					group.Label.Text = "Arenas llenas..."
 				end
 			else
-				pair.Label.Text = string.format("%s vs %s\n%d", a.DisplayName, b.DisplayName, math.ceil(remaining))
+				group.Label.Text = string.format("%d", math.ceil(remaining))
 			end
 		else
-			padTimers[pair.Id] = nil
-			if a or b then
-				pair.Label.Text = "Esperando rival..."
+			groupTimers[group.Id] = nil
+			if filled > 0 then
+				group.Label.Text = string.format("Esperando %d/%d", filled, needed)
 			else
-				pair.Label.Text = "DUELO 1v1"
+				group.Label.Text = "DUELO " .. group.Mode
 			end
+		end
+	end
+	-- Pad de BOT: abre el menú de dificultad al subirse
+	local bp = ArenaService.BotPad()
+	if bp then
+		local p = playerOnPad(bp)
+		if p and os.clock() - (botPadLast[p] or 0) > 4 then
+			botPadLast[p] = os.clock()
+			Net.Event("OpenBotMenu"):FireClient(p)
 		end
 	end
 end
@@ -179,7 +209,10 @@ function MatchmakingService.Start()
 	Players.PlayerRemoving:Connect(function(p)
 		lastBotRequest[p] = nil
 	end)
-	Players.PlayerRemoving:Connect(leaveQueue)
+	Players.PlayerRemoving:Connect(function(p)
+		leaveQueue(p)
+		botPadLast[p] = nil
+	end)
 
 	task.spawn(function()
 		while true do

@@ -289,6 +289,13 @@ local function onPlayerAdded(player: Player)
 	setupLeaderstats(player, data)
 	DataService.Push(player)
 	DataService.Loaded:Fire(player, data)
+	if useMemory then
+		task.delay(3, function()
+			if player.Parent then
+				Net.Event("Notify"):FireClient(player, "⚠ Guardado desactivado: en Studio activa Game Settings → Security → Enable Studio Access to API Services", Color3.fromRGB(255, 200, 80))
+			end
+		end)
+	end
 end
 
 local function onPlayerRemoving(player: Player)

@@ -28,6 +28,7 @@ local Rank = require(Shared.Rank)
 local Net = require(Shared.Net)
 
 local DataService = require(script.Parent.DataService)
+local CombatService = require(script.Parent.CombatService)
 
 local AdminService = {}
 
@@ -141,6 +142,7 @@ local function eachData(targets: { Player }, fn: (Player, any) -> ()): number
 		if d then
 			fn(p, d)
 			DataService.Push(p)
+			CombatService.Rearm(p) -- si está en un duelo, se le cambia el arma al momento
 			n += 1
 		end
 	end
@@ -237,7 +239,8 @@ COMMANDS.skins = {
 			for id in Skins.List do
 				d.Inventory.Skins[id] = true
 			end
-			notify(p, "Un admin te dio TODAS las skins", Color3.fromRGB(255, 205, 60))
+			d.Equipped.Skin = "Headless"
+			notify(p, "Un admin te dio TODAS las skins (equipada: Jinete sin cabeza; cámbiala en ARSENAL)", Color3.fromRGB(255, 205, 60))
 		end)
 		return "Todas las skins a " .. n .. " jugador(es)"
 	end,
@@ -252,7 +255,8 @@ COMMANDS.weapons = {
 				end
 			end
 			d.Level = math.max(d.Level, 20) -- desbloquea también las de nivel
-			notify(p, "Un admin te dio TODAS las armas", Color3.fromRGB(255, 205, 60))
+			d.Equipped.Weapon = "Reaper"
+			notify(p, "Un admin te dio TODAS las armas (equipada: The Reaper; cámbiala en ARSENAL)", Color3.fromRGB(255, 205, 60))
 		end)
 		return "Todas las armas a " .. n .. " jugador(es)"
 	end,

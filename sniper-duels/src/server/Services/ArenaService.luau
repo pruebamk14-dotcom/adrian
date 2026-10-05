@@ -34,6 +34,15 @@ export type PadPair = {
 	Label: TextLabel,
 }
 
+-- Grupo de pads: cada equipo tiene uno (1v1) o dos (2v2) cuadrados
+export type PadGroup = {
+	Id: number,
+	Mode: string, -- "1v1" | "2v2"
+	A: { BasePart },
+	B: { BasePart },
+	Label: TextLabel,
+}
+
 type Theme = {
 	Name: string,
 	Ground: Enum.Material,
@@ -47,6 +56,8 @@ type Theme = {
 
 local arenas: { Arena } = {}
 local padPairs: { PadPair } = {}
+local padGroups: { PadGroup } = {}
+local botPad: BasePart? = nil
 local lobbySpawn = CFrame.new(0, 5, 0)
 
 local HALLOWEEN_THEMES: { Theme } = {
@@ -447,17 +458,53 @@ local function buildLobby(): Model
 	t2.Parent = sg
 	sg.Parent = sign
 
-	-- Pares de pads de duelo
-	for i = 1, 4 do
-		local x = -60 + (i - 1) * 40
-		local a = block(lobby, "PadA_" .. i, Vector3.new(8, 0.6, 8), CFrame.new(x, 0.3, -10), Color3.fromRGB(255, 110, 20), Enum.Material.Neon)
-		local b = block(lobby, "PadB_" .. i, Vector3.new(8, 0.6, 8), CFrame.new(x, 0.3, -40), Color3.fromRGB(160, 70, 255), Enum.Material.Neon)
+	-- Sala de espera: cuadrados 1v1 (x2), 2v2 y BOT, cada uno con su cartel
+	local padA, padB = Color3.fromRGB(255, 110, 20), Color3.fromRGB(160, 70, 255)
+	local function signPost(cf: CFrame, text: string, color: Color3)
+		local post = block(lobby, "SignPost", Vector3.new(0.6, 9, 0.6), cf * CFrame.new(0, 4.5, 0), Color3.fromRGB(40, 36, 44), Enum.Material.Metal)
+		local board = block(lobby, "SignBoard", Vector3.new(14, 5, 0.6), cf * CFrame.new(0, 11, 0), Color3.fromRGB(18, 14, 22), Enum.Material.SmoothPlastic)
+		local _ = post
+		for _, face in { Enum.NormalId.Front, Enum.NormalId.Back } do
+			local gui = Instance.new("SurfaceGui")
+			gui.Face = face
+			gui.CanvasSize = Vector2.new(560, 200)
+			gui.LightInfluence = 0
+			gui.Brightness = 2
+			local t = Instance.new("TextLabel")
+			t.Size = UDim2.fromScale(1, 1)
+			t.BackgroundTransparency = 1
+			t.Font = Enum.Font.GothamBlack
+			t.TextScaled = true
+			t.TextColor3 = color
+			t.Text = text
+			t.Parent = gui
+			gui.Parent = board
+		end
+	end
+	for i = 1, 2 do
+		local x = -75 + (i - 1) * 36
+		block(lobby, "PadA_" .. i, Vector3.new(8, 0.6, 8), CFrame.new(x, 0.3, -10), padA, Enum.Material.Neon)
+		block(lobby, "PadB_" .. i, Vector3.new(8, 0.6, 8), CFrame.new(x, 0.3, -40), padB, Enum.Material.Neon)
 		block(lobby, "PadLink", Vector3.new(1, 0.2, 22), CFrame.new(x, 0.1, -25), Color3.fromRGB(50, 45, 55), Enum.Material.Metal)
-		if halloween then
-			Props.Pumpkin(lobby, CFrame.new(x + 6, 0, -10), 2.4, true)
-			Props.Pumpkin(lobby, CFrame.new(x - 6, 0, -40), 2.4, true)
-		else
-			Props.Lantern(lobby, CFrame.new(x + 6, 0, -25))
+		signPost(CFrame.new(x, 0, -56), "DUELO 1v1", padA)
+	end
+	-- 2v2: dos cuadrados por equipo
+	do
+		local x = 10
+		for k = 1, 2 do
+			block(lobby, "Pad2A_1_" .. k, Vector3.new(7, 0.6, 7), CFrame.new(x + (k - 1.5) * 9, 0.3, -10), padA, Enum.Material.Neon)
+			block(lobby, "Pad2B_1_" .. k, Vector3.new(7, 0.6, 7), CFrame.new(x + (k - 1.5) * 9, 0.3, -40), padB, Enum.Material.Neon)
+		end
+		block(lobby, "PadLink", Vector3.new(1, 0.2, 22), CFrame.new(x, 0.1, -25), Color3.fromRGB(50, 45, 55), Enum.Material.Metal)
+		signPost(CFrame.new(x, 0, -56), "DUELO 2v2", padB)
+	end
+	-- BOT: un cuadrado; al subirte se abre el menú de dificultad
+	block(lobby, "BotPad", Vector3.new(9, 0.6, 9), CFrame.new(70, 0.3, -25), Color3.fromRGB(255, 180, 40), Enum.Material.Neon)
+	signPost(CFrame.new(70, 0, -40), "VS BOT (solo)", Color3.fromRGB(255, 180, 40))
+	if halloween then
+		for _, x in { -75, -39, 10, 70 } do
+			Props.Pumpkin(lobby, CFrame.new(x + 7, 0, -58), 2.4, true)
+			Props.Pumpkin(lobby, CFrame.new(x - 7, 0, -58), 2.4, true)
 		end
 	end
 
@@ -513,7 +560,25 @@ function ArenaService.Start()
 		local label = padLabel(a, "DUELO 1v1")
 		padLabel(b, "")
 		table.insert(padPairs, { Id = i, A = a, B = b, Label = label })
+		table.insert(padGroups, { Id = #padGroups + 1, Mode = "1v1", A = { a }, B = { b }, Label = label })
 		i += 1
+	end
+	i = 1
+	while true do
+		local a1 = lobbyModel:FindFirstChild("Pad2A_" .. i .. "_1") :: BasePart?
+		local a2 = lobbyModel:FindFirstChild("Pad2A_" .. i .. "_2") :: BasePart?
+		local b1 = lobbyModel:FindFirstChild("Pad2B_" .. i .. "_1") :: BasePart?
+		local b2 = lobbyModel:FindFirstChild("Pad2B_" .. i .. "_2") :: BasePart?
+		if not (a1 and a2 and b1 and b2) then
+			break
+		end
+		local label = padLabel(a1, "DUELO 2v2")
+		table.insert(padGroups, { Id = #padGroups + 1, Mode = "2v2", A = { a1, a2 }, B = { b1, b2 }, Label = label })
+		i += 1
+	end
+	botPad = lobbyModel:FindFirstChild("BotPad") :: BasePart?
+	if botPad then
+		padLabel(botPad, "VS BOT")
 	end
 
 	local folder = workspace:FindFirstChild("Arenas")
@@ -571,6 +636,14 @@ end
 
 function ArenaService.PadPairs(): { PadPair }
 	return padPairs
+end
+
+function ArenaService.PadGroups(): { PadGroup }
+	return padGroups
+end
+
+function ArenaService.BotPad(): BasePart?
+	return botPad
 end
 
 return ArenaService

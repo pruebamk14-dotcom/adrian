@@ -10,6 +10,8 @@ export type Skin = {
 	Material: Enum.Material,
 	Glow: boolean?,
 	Crate: string, -- "Standard" | "Halloween"
+	Pattern: string?, -- "camo" | "stripes" | "dots" | "flames" | nil (liso)
+	Pattern2: Color3?, -- tercer color del dibujo
 }
 
 local Rarities = {
@@ -64,6 +66,37 @@ local List: { [string]: Skin } = {
 	Phantom = skin("Phantom", "Fantasma", "Legendario", Color3.fromRGB(200, 240, 255), Color3.fromRGB(120, 200, 255), Enum.Material.ForceField, true, "Halloween"),
 	Headless = skin("Headless", "Jinete sin cabeza", "Mítico", Color3.fromRGB(255, 110, 0), Color3.fromRGB(10, 10, 10), Enum.Material.Neon, true, "Halloween"),
 }
+
+-- Dibujos: se pintan con piezas finas encima del cuerpo del arma
+local PATTERNS: { [string]: { string | Color3 } } = {
+	Woodland = { "camo", Color3.fromRGB(120, 95, 60) },
+	Desert = { "camo", Color3.fromRGB(150, 120, 80) },
+	Arctic = { "camo", Color3.fromRGB(120, 130, 140) },
+	BlueCamo = { "camo", Color3.fromRGB(120, 180, 255) },
+	GreenCamo = { "camo", Color3.fromRGB(140, 160, 90) },
+	PinkCamo = { "camo", Color3.fromRGB(255, 190, 230) },
+	Glacial = { "dots", Color3.fromRGB(30, 50, 80) },
+	Carbon = { "stripes", Color3.fromRGB(55, 55, 60) },
+	Crimson = { "stripes", Color3.fromRGB(240, 200, 90) },
+	Cobalt = { "stripes", Color3.fromRGB(200, 220, 255) },
+	Dynasty = { "flames", Color3.fromRGB(230, 140, 30) },
+	Festive = { "stripes", Color3.fromRGB(255, 220, 90) },
+	Pumpkin = { "stripes", Color3.fromRGB(30, 20, 10) },
+	CandyCorn = { "stripes", Color3.fromRGB(255, 120, 20) },
+	Spiderweb = { "dots", Color3.fromRGB(210, 210, 220) },
+	Bone = { "dots", Color3.fromRGB(120, 110, 95) },
+	Inferno = { "flames", Color3.fromRGB(255, 220, 60) },
+	Headless = { "flames", Color3.fromRGB(255, 220, 60) },
+	Witch = { "dots", Color3.fromRGB(120, 255, 90) },
+	Gold = { "stripes", Color3.fromRGB(255, 240, 160) },
+}
+for id, pat in PATTERNS do
+	local s = List[id]
+	if s then
+		s.Pattern = pat[1] :: string
+		s.Pattern2 = pat[2] :: Color3
+	end
+end
 
 local function rarityInfo(name: string)
 	for _, r in Rarities do

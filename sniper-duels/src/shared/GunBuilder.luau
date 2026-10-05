@@ -47,6 +47,71 @@ local function wedge(model: Model, name: string, size: Vector3, offset: CFrame, 
 	return p
 end
 
+-- Pinta el dibujo de la skin sobre las piezas "Body" (determinista: siempre
+-- sale igual para la misma skin)
+function GunBuilder.PaintPattern(model: Instance, s: any)
+	local seed = 0
+	for i = 1, #s.Id do
+		seed += string.byte(s.Id, i) * i
+	end
+	local rng = Random.new(seed)
+	local colors = { s.Accent, s.Pattern2 or s.Accent }
+	for _, body in model:GetDescendants() do
+		if body:IsA("Part") and body:GetAttribute("SkinKind") == "Body" and body.Shape == Enum.PartType.Block then
+			local size = body.Size
+			local count = if s.Pattern == "dots" then 6 elseif s.Pattern == "stripes" then 3 else 5
+			for k = 1, count do
+				-- Elegir una cara lateral (±X) o superior (+Y)
+				local face = rng:NextInteger(1, 3)
+				local thickness = 0.02
+				local w, h, offset
+				if s.Pattern == "stripes" then
+					w, h = size.Y * 1.02, math.min(size.Z, size.X) * 0.18 + 0.04
+					offset = CFrame.new(0, 0, -size.Z / 2 + (k - 0.5) * size.Z / count) * CFrame.Angles(math.rad(35), 0, 0)
+				elseif s.Pattern == "dots" then
+					w = math.min(size.Y, size.Z) * rng:NextNumber(0.15, 0.3)
+					h = w
+					offset = CFrame.new(0, rng:NextNumber(-0.35, 0.35) * size.Y, rng:NextNumber(-0.45, 0.45) * size.Z)
+				elseif s.Pattern == "flames" then
+					w, h = size.Y * rng:NextNumber(0.3, 0.6), size.Z * rng:NextNumber(0.2, 0.35)
+					offset = CFrame.new(0, -size.Y * 0.3 + w * 0.3, rng:NextNumber(-0.4, 0.4) * size.Z) * CFrame.Angles(math.rad(rng:NextNumber(-25, 25)), 0, 0)
+				else -- camo: manchas irregulares
+					w, h = size.Y * rng:NextNumber(0.35, 0.7), size.Z * rng:NextNumber(0.15, 0.35)
+					offset = CFrame.new(0, rng:NextNumber(-0.3, 0.3) * size.Y, rng:NextNumber(-0.4, 0.4) * size.Z) * CFrame.Angles(math.rad(rng:NextNumber(-40, 40)), 0, 0)
+				end
+				local p = Instance.new("Part")
+				p.Name = "Pattern"
+				p.CanCollide = false
+				p.CanQuery = false
+				p.CanTouch = false
+				p.Massless = true
+				p.CastShadow = false
+				p.Anchored = body.Anchored
+				p.Material = if s.Pattern == "flames" then Enum.Material.Neon else Enum.Material.SmoothPlastic
+				p.Color = colors[rng:NextInteger(1, #colors)]
+				p:SetAttribute("SkinKind", "Pattern")
+				local faceCf
+				if face == 1 then
+					p.Size = Vector3.new(thickness, math.min(w, size.Y), math.min(h, size.Z))
+					faceCf = CFrame.new(size.X / 2 + thickness / 2, 0, 0)
+				elseif face == 2 then
+					p.Size = Vector3.new(thickness, math.min(w, size.Y), math.min(h, size.Z))
+					faceCf = CFrame.new(-size.X / 2 - thickness / 2, 0, 0)
+				else
+					p.Size = Vector3.new(math.min(w, size.X), thickness, math.min(h, size.Z))
+					faceCf = CFrame.new(0, size.Y / 2 + thickness / 2, 0)
+				end
+				p.CFrame = body.CFrame * faceCf * offset
+				local weld = Instance.new("WeldConstraint")
+				weld.Part0 = body
+				weld.Part1 = p
+				weld.Parent = p
+				p.Parent = body.Parent
+			end
+		end
+	end
+end
+
 function GunBuilder.ApplySkin(model: Instance, skinId: string)
 	local s = Skins.Get(skinId)
 	for _, d in model:GetDescendants() do
@@ -72,6 +137,15 @@ function GunBuilder.ApplySkin(model: Instance, skinId: string)
 	local glow = model:FindFirstChild("SkinGlow", true)
 	if glow then
 		glow:Destroy()
+	end
+	-- Dibujo (camuflaje, rayas, puntos, llamas) con piezas finas pegadas al cuerpo
+	for _, d in model:GetDescendants() do
+		if d:IsA("BasePart") and d:GetAttribute("SkinKind") == "Pattern" then
+			d:Destroy()
+		end
+	end
+	if s.Pattern then
+		GunBuilder.PaintPattern(model, s)
 	end
 	if s.Glow then
 		local body = (model:FindFirstChild("Receiver") or model:FindFirstChild("Handle")) :: BasePart?

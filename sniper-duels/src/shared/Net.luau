@@ -15,6 +15,8 @@ local EVENTS = {
 	"ScopeState", -- C->S: bool (para velocidad de movimiento)
 	"ShotFx", -- S->C: shooterCharacter, origin, direction, weaponId, skinId
 	"HitConfirm", -- S->C: zone, damage, killed, distance
+	"ShotResult", -- S->C: texto de diagnóstico del disparo
+	"OpenBotMenu", -- S->C: el jugador se subió al pad de BOT
 	"Damaged", -- S->C: fromPosition, damage, health
 	"DuelState", -- S->C: tabla de estado del duelo
 	"KillFeed", -- S->C: info { KillerName, VictimName, KillerIsMe, VictimIsMe, Headshot, Distance, WeaponId, VictimCharacter }

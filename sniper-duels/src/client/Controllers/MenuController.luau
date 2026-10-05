@@ -21,6 +21,7 @@ local AdminUI = require(script.Parent.Parent.UI.AdminUI)
 local PauseMenu = require(script.Parent.Parent.UI.PauseMenu)
 local DailyUI = require(script.Parent.Parent.UI.DailyUI)
 local DebugOverlay = require(script.Parent.Parent.UI.DebugOverlay)
+local InspectUI = require(script.Parent.Parent.UI.InspectUI)
 local HUDController = require(script.Parent.HUDController)
 
 local T = Make.Theme
@@ -238,6 +239,10 @@ local function buildArsenal()
 			)
 			local label = if equipped then "EQUIPADA" elseif locked and inShop then "🛒 EN TIENDA" elseif locked then ("NIVEL " .. w.UnlockLevel) else "EQUIPAR"
 			local btn = Make.Button(label, if equipped then T.Accent elseif locked and inShop then T.Gold elseif locked then T.PanelLight else T.Blue, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -14, 0.5, 0), Size = UDim2.fromOffset(140, 40), TextSize = 15, Parent = c })
+			Make.Button("👁", T.PanelLight, { AnchorPoint = Vector2.new(1, 0.5), Position = UDim2.new(1, -162, 0.5, 0), Size = UDim2.fromOffset(44, 40), TextSize = 18, Parent = c }, function()
+				MenuController.Close()
+				InspectUI.Open("Rifle", id, d.Equipped.Skin)
+			end)
 			btn.Active = not equipped
 			btn.MouseButton1Click:Connect(function()
 				if not locked and not equipped then
@@ -271,6 +276,10 @@ local function buildArsenal()
 			})
 			Make.Label(s.DisplayName, { Position = UDim2.fromOffset(10, 60), Size = UDim2.new(1, -20, 0, 20), TextXAlignment = Enum.TextXAlignment.Left, TextSize = 15, TextColor3 = if owned then T.Text else T.SubText, Parent = cell })
 			Make.Label(if owned then s.Rarity else "🔒 " .. s.Rarity, { Position = UDim2.fromOffset(10, 82), Size = UDim2.new(1, -20, 0, 16), TextXAlignment = Enum.TextXAlignment.Left, TextSize = 12, TextColor3 = rarity.Color, Parent = cell })
+			Make.Button("👁", T.PanelLight, { AnchorPoint = Vector2.new(1, 1), Position = UDim2.new(1, -6, 1, -6), Size = UDim2.fromOffset(30, 26), TextSize = 14, ZIndex = 3, Parent = cell }, function()
+				MenuController.Close()
+				InspectUI.Open("Rifle", d.Equipped.Weapon, s.Id)
+			end)
 			cell.MouseButton1Click:Connect(function()
 				if owned and not equipped then
 					Net.Function("EquipSkin"):InvokeServer(s.Id)
@@ -410,6 +419,7 @@ local function setVisible(visible: boolean)
 		TradeUI.CloseAll()
 		AdminUI.Close()
 		DailyUI.Close()
+		InspectUI.Close()
 	end
 end
 
@@ -425,6 +435,7 @@ function MenuController.Start()
 	PauseMenu.Build(gui)
 	DailyUI.Build(gui, HUDController.Toast)
 	DebugOverlay.Build(gui)
+	InspectUI.Build(gui)
 	buildLeaderboard()
 	buildStats()
 
@@ -437,6 +448,11 @@ function MenuController.Start()
 		end
 	end)
 	Net.Event("QueueState").OnClientEvent:Connect(refreshQueue)
+	Net.Event("OpenBotMenu").OnClientEvent:Connect(function()
+		if not ClientState.Duel and openPanel ~= "Bot" then
+			MenuController.Open("Bot")
+		end
+	end)
 	ClientState.DuelChanged:Connect(function(state)
 		setVisible(state.State == "Ended")
 	end)

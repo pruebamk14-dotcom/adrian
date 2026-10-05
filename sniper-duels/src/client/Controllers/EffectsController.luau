@@ -19,6 +19,7 @@ local Net = require(Shared.Net)
 
 local player = Players.LocalPlayer
 local camera = workspace.CurrentCamera
+local ClientState = require(script.Parent.Parent.ClientState)
 
 local EffectsController = {}
 
@@ -454,16 +455,13 @@ function EffectsController.Start()
 
 	RunService.RenderStepped:Connect(updateGlints)
 
-	-- El temblor se aplica después de la cámara y del arma
+	-- Temblor: se publica como desplazamiento para el viewmodel y el HUD
+	-- (no se toca la cámara: el script de cámara de Roblox la reconstruye y daría saltos)
 	RunService:BindToRenderStep("SD_Shake", Enum.RenderPriority.Camera.Value + 2, function(dt)
 		shake = math.max(0, shake - dt * 4)
 		local t = os.clock() * 40
-		local target = if shake > 0.01
-			then CFrame.Angles(math.rad(math.noise(t, 0) * shake), math.rad(math.noise(0, t) * shake), math.rad(math.noise(t, t) * shake * 0.5))
-			else CFrame.identity
-		-- Igual que con el sway: aplicar solo la diferencia
-		camera.CFrame = camera.CFrame * appliedShake:Inverse() * target
-		appliedShake = target
+		ClientState.ShakeOffset = if shake > 0.01 then Vector3.new(math.noise(t, 0) * shake * 3, math.noise(0, t) * shake * 3, 0) else Vector3.zero
+		local _ = appliedShake
 	end)
 end
 

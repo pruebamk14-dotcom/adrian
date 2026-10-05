@@ -15,7 +15,11 @@ local ClientState = {
 	Scoped = false,
 	Slot = 1, -- 1 rifle, 2 cuchillo
 	Crouched = false,
-	MenuOpen = false, -- menú de pausa abierto: bloquea disparo y movimiento
+	MenuOpen = false,
+	Sway = Vector2.zero, -- vaivén de la mira en grados (x, y)
+	Recoil = 0,
+	ShakeOffset = Vector3.zero, -- temblor (se aplica al viewmodel y al HUD)
+	LastShot = "", -- texto de diagnóstico del último disparo -- menú de pausa abierto: bloquea disparo y movimiento
 	ScopeProgress = 0,
 	Breath = 1, -- 0..1, aguantar respiración
 

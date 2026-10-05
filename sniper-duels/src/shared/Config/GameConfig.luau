@@ -47,7 +47,7 @@ local GameConfig = {
 	MaxRewindTime = 0.45, -- segundos máximos de lag compensation
 	HistoryLength = 1.0,
 	MaxOriginDistance = 10, -- distancia máxima entre cabeza y origen del disparo
-	HitboxInflate = 1.08,
+	HitboxInflate = 1.22,
 	ViewInterpolationDelay = 0.06, -- retraso aprox. con el que el cliente ve a los demás
 	MaxBulletDistance = 2500,
 	BallisticStep = 1 / 120,
@@ -119,8 +119,8 @@ local GameConfig = {
 	-- Agacharse / deslizarse
 	CrouchSpeedMultiplier = 0.5,
 	CrouchHipDrop = 1.3,
-	SlideSpeed = 34,
-	SlideDuration = 0.75,
+	SlideSpeed = 40,
+	SlideDuration = 0.85,
 
 	-- Intercambios
 	TradeConfirmTime = 4, -- s de cuenta atrás tras aceptar ambos (anti-estafa)

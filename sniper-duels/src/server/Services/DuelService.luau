@@ -1,7 +1,7 @@
 --!strict
--- Ciclo de vida del duelo 1v1: intro -> cuenta atrás -> ronda -> fin de ronda
--- ... -> fin del duelo (recompensas, ELO, rachas) -> vuelta al lobby.
--- Un lado puede ser un bot (modo solo): ver BotService.
+-- Ciclo de vida de un duelo por equipos (1v1, 2v2 o contra bot):
+-- intro -> cuenta atrás -> ronda -> fin de ronda ... -> fin del duelo
+-- (recompensas, ELO en ranked 1v1, rachas) -> vuelta al lobby.
 
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -20,13 +20,17 @@ type Combatant = any -- Player | Bot
 
 type Duel = {
 	Id: number,
+	Teams: { A: { Combatant }, B: { Combatant } },
+	TeamOf: { [Combatant]: string },
 	Players: { Combatant },
 	Arena: ArenaService.Arena,
-	Scores: { [Combatant]: number },
+	Scores: { A: number, B: number },
 	Kills: { [Combatant]: number },
 	Headshots: { [Combatant]: number },
+	Alive: { [Combatant]: boolean },
 	Round: number,
 	State: string,
+	Mode: string, -- "1v1" | "2v2" | "BOT"
 	Ranked: boolean,
 	VsBot: boolean,
 	RoundToken: number,
@@ -56,8 +60,30 @@ local function present(c: Combatant): boolean
 	return c.Active == true
 end
 
-local function opponentOf(duel: Duel, c: Combatant): Combatant
-	return if duel.Players[1] == c then duel.Players[2] else duel.Players[1]
+local function otherTeam(team: string): string
+	return if team == "A" then "B" else "A"
+end
+
+local function enemiesOf(duel: Duel, c: Combatant): { Combatant }
+	return duel.Teams[otherTeam(duel.TeamOf[c])]
+end
+
+local function alliesOf(duel: Duel, c: Combatant): { Combatant }
+	local out = {}
+	for _, m in duel.Teams[duel.TeamOf[c]] do
+		if m ~= c then
+			table.insert(out, m)
+		end
+	end
+	return out
+end
+
+local function names(list: { Combatant }): string
+	local out = {}
+	for _, c in list do
+		table.insert(out, c.DisplayName)
+	end
+	return table.concat(out, " & ")
 end
 
 local function eloOf(c: Combatant): number
@@ -67,23 +93,38 @@ local function eloOf(c: Combatant): number
 	return c.Elo or GameConfig.StartingElo
 end
 
+local function teamAlive(duel: Duel, team: string): number
+	local n = 0
+	for _, c in duel.Teams[team] do
+		if duel.Alive[c] then
+			n += 1
+		end
+	end
+	return n
+end
+
 local function sendState(duel: Duel, extra: { [string]: any }?)
 	for _, p in duel.Players do
 		if isPlayer(p) and p.Parent then
-			local opp = opponentOf(duel, p)
+			local team = duel.TeamOf[p]
+			local enemies = enemiesOf(duel, p)
 			local payload: { [string]: any } = {
 				State = duel.State,
 				Round = duel.Round,
 				RoundsToWin = GameConfig.RoundsToWin,
-				MyScore = duel.Scores[p],
-				OppScore = duel.Scores[opp],
-				OpponentName = opp.DisplayName,
-				OpponentElo = eloOf(opp),
-				OpponentIsBot = not isPlayer(opp),
+				MyScore = duel.Scores[team],
+				OppScore = duel.Scores[otherTeam(team)],
+				OpponentName = names(enemies),
+				AllyNames = names(alliesOf(duel, p)),
+				OpponentElo = if #enemies == 1 then eloOf(enemies[1]) else nil,
+				OpponentIsBot = #enemies == 1 and not isPlayer(enemies[1]),
 				Arena = duel.Arena.Name,
+				Mode = duel.Mode,
 				Ranked = duel.Ranked,
 				VsBot = duel.VsBot,
 				EndsAt = duel.RoundEndsAt,
+				AlliesAlive = teamAlive(duel, team),
+				EnemiesAlive = teamAlive(duel, otherTeam(team)),
 			}
 			if extra then
 				for k, v in extra do
@@ -92,11 +133,11 @@ local function sendState(duel: Duel, extra: { [string]: any }?)
 					end
 				end
 				if extra.RoundWinner ~= nil or extra.Reason == "draw" then
-					payload.RoundWon = extra.RoundWinner == p
+					payload.RoundWon = extra.RoundWinner == team
 					payload.IsDraw = extra.RoundWinner == nil
 				end
 				if extra.Winner ~= nil then
-					payload.Won = extra.Winner == p
+					payload.Won = extra.Winner == team
 				end
 				if extra.PerPlayer and extra.PerPlayer[p] then
 					for k, v in extra.PerPlayer[p] do
@@ -132,8 +173,8 @@ local function clearHighlights(duel: Duel)
 	end
 end
 
-local roundOver: (duel: Duel, winner: Combatant?, reason: string) -> ()
-local endDuel: (duel: Duel, winner: Combatant, reason: string) -> ()
+local roundOver: (duel: Duel, winner: string?, reason: string) -> ()
+local endDuel: (duel: Duel, winner: string, reason: string) -> ()
 
 local function spawnCombatant(duel: Duel, c: Combatant, cf: CFrame)
 	if isPlayer(c) then
@@ -177,23 +218,33 @@ local function spawnRound(duel: Duel)
 	local token = duel.RoundToken
 	duel.LastKill = nil
 	duel.State = "Countdown"
+	for _, c in duel.Players do
+		duel.Alive[c] = true
+	end
 
-	-- Cargar ambos personajes en paralelo
+	-- Cargar todos los personajes en paralelo; los compañeros aparecen en fila
 	local pending = 0
-	for i, c in duel.Players do
-		pending += 1
-		task.spawn(function()
-			if present(c) then
-				local ok, err = pcall(spawnCombatant, duel, c, if i == 1 then duel.Arena.SpawnA else duel.Arena.SpawnB)
-				if not ok then
-					warn("[Duel] spawn:", err)
-					if isPlayer(c) then
-						Net.Event("Notify"):FireClient(c, "ERROR al preparar el arma: " .. tostring(err), Color3.fromRGB(255, 80, 80))
+	for _, team in { "A", "B" } do
+		local base = if team == "A" then duel.Arena.SpawnA else duel.Arena.SpawnB
+		local members = duel.Teams[team]
+		for i, c in members do
+			pending += 1
+			local cf = base * CFrame.new((i - (#members + 1) / 2) * 5, 0, 0)
+			task.spawn(function()
+				if present(c) then
+					local ok, err = pcall(spawnCombatant, duel, c, cf)
+					if not ok then
+						warn("[Duel] spawn:", err)
+						if isPlayer(c) then
+							Net.Event("Notify"):FireClient(c, "ERROR al preparar el arma: " .. tostring(err), Color3.fromRGB(255, 80, 80))
+						end
 					end
+				else
+					duel.Alive[c] = false
 				end
-			end
-			pending -= 1
-		end)
+				pending -= 1
+			end)
+		end
 	end
 	local waitStart = os.clock()
 	while pending > 0 and os.clock() - waitStart < 10 do
@@ -203,16 +254,19 @@ local function spawnRound(duel: Duel)
 		return
 	end
 
-	-- Muerte por cualquier causa (caída, reset...) = punto para el rival
+	-- Muerte por cualquier causa (caída, reset...) cuenta como baja
 	for _, c in duel.Players do
 		local hum = c.Character and c.Character:FindFirstChildOfClass("Humanoid")
 		if hum then
 			table.insert(
 				duel.Connections,
 				hum.Died:Connect(function()
+					duel.Alive[c] = false
 					task.delay(0.15, function()
-						if duel.RoundToken == token and duel.State == "Live" then
-							roundOver(duel, opponentOf(duel, c), "death")
+						if duel.RoundToken == token and duel.State == "Live" and teamAlive(duel, duel.TeamOf[c]) == 0 then
+							roundOver(duel, otherTeam(duel.TeamOf[c]), "death")
+						elseif duel.RoundToken == token and duel.State == "Live" then
+							sendState(duel)
 						end
 					end)
 				end)
@@ -255,27 +309,31 @@ local function spawnRound(duel: Duel)
 		end
 	end)
 
-	-- Límite de tiempo: gana quien tenga más vida
+	-- Límite de tiempo: gana el equipo con más vida total
 	task.delay(GameConfig.RoundMaxTime, function()
 		if duel.RoundToken ~= token or duel.State ~= "Live" then
 			return
 		end
-		local a, b = duel.Players[1], duel.Players[2]
-		local function hp(c: Combatant): number
-			local h = c.Character and c.Character:FindFirstChildOfClass("Humanoid")
-			return h and h.Health or 0
+		local function hp(team: string): number
+			local total = 0
+			for _, c in duel.Teams[team] do
+				local h = c.Character and c.Character:FindFirstChildOfClass("Humanoid")
+				total += if h and duel.Alive[c] then h.Health else 0
+			end
+			return total
 		end
-		if hp(a) > hp(b) then
-			roundOver(duel, a, "time")
-		elseif hp(b) > hp(a) then
-			roundOver(duel, b, "time")
+		local a, b = hp("A"), hp("B")
+		if a > b then
+			roundOver(duel, "A", "time")
+		elseif b > a then
+			roundOver(duel, "B", "time")
 		else
 			roundOver(duel, nil, "draw")
 		end
 	end)
 end
 
-roundOver = function(duel: Duel, winner: Combatant?, reason: string)
+roundOver = function(duel: Duel, winner: string?, reason: string)
 	if duel.Finished or duel.State ~= "Live" then
 		return
 	end
@@ -319,7 +377,7 @@ local function returnToLobby(c: Combatant)
 	end
 end
 
-endDuel = function(duel: Duel, winner: Combatant, reason: string)
+endDuel = function(duel: Duel, winner: string, reason: string)
 	if duel.Finished then
 		return
 	end
@@ -330,18 +388,20 @@ endDuel = function(duel: Duel, winner: Combatant, reason: string)
 	for _, c in duel.Players do
 		CombatService.SetCanFire(c, false)
 	end
-	local loser = opponentOf(duel, winner)
+	local loserTeam = otherTeam(winner)
 	local R = GameConfig.Rewards
 	local mult = if duel.Ranked then R.RankedMultiplier elseif duel.VsBot then R.BotMultiplier else 1
 
 	local perPlayer = {}
-	local wd = if isPlayer(winner) then DataService.Get(winner) else nil
-	local ld = if isPlayer(loser) then DataService.Get(loser) else nil
 
+	-- ELO solo en ranked 1v1
 	local eloW, eloL = 0, 0
-	if duel.Ranked and wd then
-		-- Si el perdedor abandonó, sus datos pueden haberse descargado ya
-		local loserElo = if ld then ld.Elo else eloOf(loser)
+	local wp = duel.Teams[winner][1]
+	local lp = duel.Teams[loserTeam][1]
+	local wd = if wp and isPlayer(wp) then DataService.Get(wp) else nil
+	local ld = if lp and isPlayer(lp) then DataService.Get(lp) else nil
+	if duel.Ranked and wd and lp then
+		local loserElo = if ld then ld.Elo else eloOf(lp)
 		local loserPlayed = if ld then ld.RankedPlayed else GameConfig.PlacementMatches
 		local kW = if wd.RankedPlayed < GameConfig.PlacementMatches then GameConfig.EloKPlacement else GameConfig.EloK
 		local kL = if loserPlayed < GameConfig.PlacementMatches then GameConfig.EloKPlacement else GameConfig.EloK
@@ -360,7 +420,7 @@ endDuel = function(duel: Duel, winner: Combatant, reason: string)
 			continue
 		end
 		local d = DataService.Get(p)
-		local won = p == winner
+		local won = duel.TeamOf[p] == winner
 		local kills = duel.Kills[p] or 0
 		local base = (if won then R.WinCoins else R.LossCoins) + kills * R.KillCoins + (duel.Headshots[p] or 0) * R.HeadshotBonusCoins
 		local coins = math.floor(base * mult)
@@ -417,7 +477,7 @@ endDuel = function(duel: Duel, winner: Combatant, reason: string)
 		for _, p in Players:GetPlayers() do
 			Net.Event("Notify"):FireClient(
 				p,
-				string.format("%s venció a %s (%d-%d)%s", winner.DisplayName, loser.DisplayName, duel.Scores[winner], duel.Scores[loser], if duel.Ranked then " · Ranked" else ""),
+				string.format("%s venció a %s (%d-%d)%s", names(duel.Teams[winner]), names(duel.Teams[loserTeam]), duel.Scores[winner], duel.Scores[loserTeam], if duel.Ranked then " · Ranked" elseif duel.Mode == "2v2" then " · 2v2" else ""),
 				Color3.fromRGB(200, 200, 200)
 			)
 		end
@@ -425,46 +485,129 @@ endDuel = function(duel: Duel, winner: Combatant, reason: string)
 
 	task.wait(5)
 	for _, c in duel.Players do
-		duels[c] = nil
+		if duels[c] == duel then
+			duels[c] = nil
+		end
 		task.spawn(returnToLobby, c)
 	end
 	ArenaService.Release(duel.Arena)
 end
 
--- Abandonar el duelo (menú): el rival gana por abandono
-function DuelService.Forfeit(player: Player)
+-- Un jugador abandona (menú o desconexión)
+local function leave(player: Player, byMenu: boolean)
 	local duel = duels[player]
-	if not duel or duel.Finished then
+	if not duel then
 		return
 	end
-	local other = opponentOf(duel, player)
-	task.spawn(endDuel, duel, other, "forfeit")
+	duels[player] = nil
+	if duel.Finished then
+		return
+	end
+	local team = duel.TeamOf[player]
+	duel.Alive[player] = false
+	local members = duel.Teams[team]
+	local i = table.find(members, player)
+	if i then
+		table.remove(members, i)
+	end
+	local idx = table.find(duel.Players, player)
+	if idx then
+		table.remove(duel.Players, idx)
+	end
+	-- El que abandona recibe su "fin de duelo" (derrota) y pierde la racha
+	if isPlayer(player) and player.Parent then
+		local d = DataService.Get(player)
+		if d then
+			d.Losses += 1
+			if not duel.VsBot then
+				d.WinStreak = 0
+			end
+			DataService.Push(player)
+		end
+		Net.Event("DuelState"):FireClient(player, {
+			State = "Ended",
+			Won = false,
+			Reason = "forfeit",
+			Round = duel.Round,
+			RoundsToWin = GameConfig.RoundsToWin,
+			MyScore = duel.Scores[team],
+			OppScore = duel.Scores[otherTeam(team)],
+			OpponentName = names(duel.Teams[otherTeam(team)]),
+			AllyNames = names(members),
+			Mode = duel.Mode,
+			Ranked = duel.Ranked,
+			VsBot = duel.VsBot,
+			Coins = 0,
+			XP = 0,
+			Candies = 0,
+		})
+	end
+	if byMenu then
+		task.spawn(returnToLobby, player)
+	end
+	if #members == 0 then
+		task.spawn(endDuel, duel, otherTeam(team), "forfeit")
+	elseif duel.State == "Live" and teamAlive(duel, team) == 0 then
+		task.spawn(roundOver, duel, otherTeam(team), "death")
+	else
+		sendState(duel)
+	end
+end
+
+function DuelService.Forfeit(player: Player)
+	leave(player, true)
 end
 
 function DuelService.IsBusy(c: Combatant): boolean
 	return duels[c] ~= nil
 end
 
-function DuelService.StartDuel(a: Combatant, b: Combatant, ranked: boolean): boolean
-	if a == b or duels[a] or duels[b] or not present(a) or not present(b) then
+function DuelService.StartTeams(teamA: { Combatant }, teamB: { Combatant }, ranked: boolean): boolean
+	local all = {}
+	for _, c in teamA do
+		table.insert(all, c)
+	end
+	for _, c in teamB do
+		table.insert(all, c)
+	end
+	if #teamA == 0 or #teamB == 0 then
 		return false
+	end
+	for _, c in all do
+		if duels[c] or not present(c) then
+			return false
+		end
 	end
 	local arena = ArenaService.Acquire()
 	if not arena then
 		return false
 	end
 	nextId += 1
-	local vsBot = not isPlayer(a) or not isPlayer(b)
+	local vsBot = false
+	local teamOf = {}
+	for _, c in teamA do
+		teamOf[c] = "A"
+		vsBot = vsBot or not isPlayer(c)
+	end
+	for _, c in teamB do
+		teamOf[c] = "B"
+		vsBot = vsBot or not isPlayer(c)
+	end
+	local mode = if vsBot then "BOT" elseif #teamA == 1 and #teamB == 1 then "1v1" else string.format("%dv%d", #teamA, #teamB)
 	local duel: Duel = {
 		Id = nextId,
-		Players = { a, b },
+		Teams = { A = table.clone(teamA), B = table.clone(teamB) },
+		TeamOf = teamOf,
+		Players = all,
 		Arena = arena,
-		Scores = { [a] = 0, [b] = 0 },
-		Kills = { [a] = 0, [b] = 0 },
-		Headshots = { [a] = 0, [b] = 0 },
+		Scores = { A = 0, B = 0 },
+		Kills = {},
+		Headshots = {},
+		Alive = {},
 		Round = 0,
 		State = "Intro",
-		Ranked = ranked and not vsBot,
+		Mode = mode,
+		Ranked = ranked and mode == "1v1",
 		VsBot = vsBot,
 		RoundToken = 0,
 		RoundEndsAt = workspace:GetServerTimeNow() + GameConfig.IntroTime,
@@ -472,11 +615,22 @@ function DuelService.StartDuel(a: Combatant, b: Combatant, ranked: boolean): boo
 		Connections = {},
 		Finished = false,
 	}
-	duels[a] = duel
-	duels[b] = duel
+	for _, c in all do
+		duel.Kills[c] = 0
+		duel.Headshots[c] = 0
+		duel.Alive[c] = true
+		duels[c] = duel
+	end
 	sendState(duel)
 	task.delay(GameConfig.IntroTime, spawnRound, duel)
 	return true
+end
+
+function DuelService.StartDuel(a: Combatant, b: Combatant, ranked: boolean): boolean
+	if a == b then
+		return false
+	end
+	return DuelService.StartTeams({ a }, { b }, ranked)
 end
 
 function DuelService.Start()
@@ -485,7 +639,13 @@ function DuelService.Start()
 		if not duel or duel.State ~= "Live" then
 			return {}
 		end
-		return { opponentOf(duel, c) }
+		local out = {}
+		for _, e in enemiesOf(duel, c) do
+			if duel.Alive[e] and e.Character then
+				table.insert(out, e)
+			end
+		end
+		return out
 	end
 
 	CombatService.Killed:Connect(function(killer: Combatant, victim: Combatant, info)
@@ -497,10 +657,11 @@ function DuelService.Start()
 		if info.Headshot then
 			duel.Headshots[killer] += 1
 		end
+		duel.Alive[victim] = false
 		duel.LastKill = { Headshot = info.Headshot, Distance = info.Distance }
 		local victimChar = victim.Character
 		for _, p in Players:GetPlayers() do
-			local involved = p == killer or p == victim
+			local involved = duels[p] == duel
 			-- Los duelos contra bots solo se muestran a su jugador
 			if involved or not duel.VsBot then
 				Net.Event("KillFeed"):FireClient(p, {
@@ -516,20 +677,19 @@ function DuelService.Start()
 				})
 			end
 		end
-		roundOver(duel, killer, "kill")
+		if teamAlive(duel, duel.TeamOf[victim]) == 0 then
+			roundOver(duel, duel.TeamOf[killer], "kill")
+		else
+			sendState(duel)
+		end
 	end)
 
-	Net.Event("LeaveDuel").OnServerEvent:Connect(DuelService.Forfeit)
+	Net.Event("LeaveDuel").OnServerEvent:Connect(function(player)
+		leave(player, true)
+	end)
 
 	Players.PlayerRemoving:Connect(function(player)
-		local duel = duels[player]
-		if duel then
-			duels[player] = nil
-			local other = opponentOf(duel, player)
-			if not duel.Finished then
-				task.spawn(endDuel, duel, other, "forfeit")
-			end
-		end
+		leave(player, false)
 	end)
 end
 

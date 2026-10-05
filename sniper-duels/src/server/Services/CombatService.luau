@@ -50,6 +50,7 @@ type Bullet = {
 	Weapon: Weapons.Weapon,
 	Targets: { Combatant },
 	Params: RaycastParams,
+	Closest: number,
 }
 
 local CombatService = {}
@@ -365,13 +366,32 @@ local function stepBullet(b: Bullet, targetT: number): boolean
 
 		if bestVictim and bestFrac <= worldFrac then
 			applyHit(b, bestVictim, bestZone, from + delta * bestFrac)
+			if isPlayer(b.Shooter) then
+				Net.Event("ShotResult"):FireClient(b.Shooter, string.format("IMPACTO %s a %d studs", bestZone, math.floor((from + delta * bestFrac - b.Origin).Magnitude)))
+			end
 			return true
 		end
+		-- Distancia mínima al rival para el diagnóstico
+		for _, target in b.Targets do
+			local root = target.Character and target.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+			if root then
+				local d = (root.Position - to).Magnitude
+				if d < b.Closest then
+					b.Closest = d
+				end
+			end
+		end
 		if worldHit then
+			if isPlayer(b.Shooter) then
+				Net.Event("ShotResult"):FireClient(b.Shooter, string.format("fallo: chocó con %s (pasó a %.1f studs del rival)", worldHit.Instance.Name, b.Closest))
+			end
 			return true
 		end
 		b.T = t1
 		if b.T >= b.MaxT then
+			if isPlayer(b.Shooter) then
+				Net.Event("ShotResult"):FireClient(b.Shooter, string.format("fallo: pasó a %.1f studs del rival", b.Closest))
+			end
 			return true
 		end
 	end
@@ -451,6 +471,7 @@ local function fireShot(player: Combatant, origin: any, direction: any, shotTime
 		Weapon = w,
 		Targets = targets,
 		Params = params,
+		Closest = math.huge,
 	}
 	-- Ponerse al día con el tiempo que la bala ya lleva volando (latencia)
 	if not stepBullet(bullet, serverNow - shotTime) then

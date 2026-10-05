@@ -10,6 +10,7 @@ local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
 local ContextActionService = game:GetService("ContextActionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 
 local Net = require(ReplicatedStorage:WaitForChild("Shared").Net)
 local ClientState = require(script.Parent.Parent.ClientState)
@@ -108,6 +109,9 @@ function PauseMenu.Build(gui: ScreenGui)
 		ZIndex = 70,
 		Parent = gui,
 	})
+	-- Un botón "Modal" visible obliga a Roblox a liberar el cursor aunque la
+	-- cámara esté en primera persona (truco oficial para menús en FPS)
+	new("TextButton", { Name = "ModalUnlock", Text = "", Modal = true, Size = UDim2.fromOffset(1, 1), Position = UDim2.fromOffset(-10, -10), BackgroundTransparency = 1, ZIndex = 70, Parent = root })
 	local panel = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0.5),
 		Position = UDim2.fromScale(0.5, 0.5),
@@ -173,6 +177,16 @@ function PauseMenu.Build(gui: ScreenGui)
 		end
 		return Enum.ContextActionResult.Sink
 	end, false, Enum.KeyCode.M, Enum.KeyCode.ButtonStart)
+
+	-- Mientras el menú está abierto, cursor libre y visible cada frame
+	RunService.RenderStepped:Connect(function()
+		if root.Visible then
+			pcall(function()
+				UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+				UserInputService.MouseIconEnabled = true
+			end)
+		end
+	end)
 
 	ClientState.DuelChanged:Connect(function(state)
 		if state.State == "Ended" then
