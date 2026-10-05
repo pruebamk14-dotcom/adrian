@@ -44,6 +44,7 @@ local sprinting = false
 local triggerHeld = false
 local rescopeAfterBolt = false
 
+local fovKick = 0 -- "golpe" de FOV al disparar (sensación de potencia)
 local recoil = 0 -- grados actuales de patada
 local recoilVel = 0
 local swayOffset = CFrame.identity
@@ -150,7 +151,20 @@ local function fire()
 	local spread = currentSpread()
 	local camCf = camera.CFrame
 	local origin = camCf.Position
-	local direction = Ballistics.ApplySpread(camCf.LookVector, spread, rng)
+	local aimDir = camCf.LookVector
+	-- Si la cámara no está en la cabeza (tercera persona), disparar desde la
+	-- cabeza hacia el punto al que apunta la mira
+	local head = player.Character and player.Character:FindFirstChild("Head") :: BasePart?
+	if head and (head.Position - origin).Magnitude > 4 then
+		local params = RaycastParams.new()
+		params.FilterType = Enum.RaycastFilterType.Exclude
+		params.FilterDescendantsInstances = { player.Character :: Model, camera }
+		local hit = workspace:Raycast(origin, aimDir * 3000, params)
+		local target = if hit then hit.Position else origin + aimDir * 3000
+		origin = head.Position
+		aimDir = (target - origin).Unit
+	end
+	local direction = Ballistics.ApplySpread(aimDir, spread, rng)
 	Net.Event("Fire"):FireServer(origin, direction, workspace:GetServerTimeNow())
 
 	-- Predicción local (el servidor confirma con munición/impacto)
@@ -167,8 +181,9 @@ local function fire()
 	if not ClientState.Scoped then
 		EffectsController.MuzzleFlash(muzzlePos, direction, Color3.fromRGB(255, 200, 100))
 	end
-	EffectsController.Shake(if ClientState.Scoped then 0.5 else 0.9)
-	EffectsController.Tracer(origin, direction, weapon.Id, equippedSkin, if ClientState.Scoped then origin + camCf.UpVector * -0.3 else muzzlePos)
+	EffectsController.Shake(if ClientState.Scoped then 1.0 else 1.6)
+	fovKick = if ClientState.Scoped then 1.5 else 5
+	EffectsController.Tracer(origin, direction, weapon.Id, equippedSkin, if ClientState.Scoped then camCf.Position + camCf.UpVector * -0.3 else muzzlePos)
 	EffectsController.PlaySound("Fire", 0.9)
 
 	recoilVel += weapon.RecoilPitch * 18
@@ -211,13 +226,23 @@ local function fire()
 	end
 end
 
+local function forceFirstPerson()
+	player.CameraMode = Enum.CameraMode.LockFirstPerson
+	player.CameraMinZoomDistance = 0.5
+	player.CameraMaxZoomDistance = 0.5
+end
+
 local function onArmedChanged()
 	if ClientState.Armed then
 		weapon = Weapons.Get(ClientState.WeaponId)
 		zoomIndex = 1
-		buildViewmodel()
-		player.CameraMode = Enum.CameraMode.LockFirstPerson
+		-- Primero la cámara: aunque el modelo falle, se juega en primera persona
+		forceFirstPerson()
 		UserInputService.MouseIconEnabled = false
+		local ok, err = pcall(buildViewmodel)
+		if not ok then
+			warn("[SniperDuels] No se pudo crear el viewmodel:", err)
+		end
 	else
 		destroyViewmodel()
 		wantScope = false
@@ -228,6 +253,8 @@ local function onArmedChanged()
 		recoil, recoilVel = 0, 0
 		appliedPitch, appliedYaw = 0, 0
 		player.CameraMode = Enum.CameraMode.Classic
+		player.CameraMinZoomDistance = 0.5
+		player.CameraMaxZoomDistance = 20
 		UserInputService.MouseIconEnabled = true
 		UserInputService.MouseDeltaSensitivity = 1
 	end
@@ -324,7 +351,8 @@ local function update(dt: number)
 	local p = ClientState.ScopeProgress
 	local eased = 1 - (1 - p) ^ 3
 	local fov = BASE_FOV + (zoomFov - BASE_FOV) * eased
-	camera.FieldOfView = fov
+	fovKick = math.max(0, fovKick - dt * 30)
+	camera.FieldOfView = fov + fovKick
 	scopeBlur.Size = math.sin(math.clamp(p, 0, 1) * math.pi) * 10
 
 	-- Sensibilidad
@@ -412,12 +440,14 @@ function WeaponController.Start()
 		end
 	end)
 
-	Net.Event("AmmoUpdate").OnClientEvent:Connect(function(mag: number, reloading: boolean, weaponId: string)
+	-- Estado del arma desde los atributos del Player (ver CombatService.pushAmmo)
+	local function syncFromAttributes()
+		local weaponId = player:GetAttribute("SD_Weapon") :: string?
 		local wasArmed = ClientState.Armed
-		ClientState.Armed = mag >= 0
-		ClientState.Mag = math.max(mag, 0)
-		ClientState.Reloading = reloading
-		ClientState.WeaponId = weaponId
+		ClientState.Armed = weaponId ~= nil and weaponId ~= ""
+		ClientState.Mag = (player:GetAttribute("SD_Mag") :: number?) or 0
+		ClientState.Reloading = player:GetAttribute("SD_Reloading") == true
+		ClientState.WeaponId = weaponId or ""
 		if ClientState.Armed ~= wasArmed then
 			onArmedChanged()
 			if ClientState.Armed then
@@ -427,7 +457,11 @@ function WeaponController.Start()
 			end
 		end
 		ClientState.AmmoChanged:Fire()
-	end)
+	end
+	for _, attr in { "SD_Weapon", "SD_Mag", "SD_Reloading" } do
+		player:GetAttributeChangedSignal(attr):Connect(syncFromAttributes)
+	end
+	task.defer(syncFromAttributes)
 
 	UserInputService.InputChanged:Connect(function(input)
 		if input.UserInputType == Enum.UserInputType.MouseMovement then
@@ -439,7 +473,7 @@ function WeaponController.Start()
 	player.CharacterAdded:Connect(function()
 		if ClientState.Armed then
 			task.defer(function()
-				player.CameraMode = Enum.CameraMode.LockFirstPerson
+				forceFirstPerson()
 				recoil, recoilVel = 0, 0
 				appliedPitch, appliedYaw = 0, 0
 				ClientState.Breath = 1

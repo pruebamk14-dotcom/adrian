@@ -276,12 +276,24 @@ local function buildWindow()
 	end)
 end
 
+local function hideIncoming()
+	incomingFrom = nil
+	local tw = TweenService:Create(incoming, TweenInfo.new(0.25), { Position = UDim2.new(0.5, 0, 0, -160) })
+	tw:Play()
+	tw.Completed:Once(function()
+		if not incomingFrom then
+			incoming.Visible = false
+		end
+	end)
+end
+
 local function buildIncoming()
 	incoming = new("Frame", {
 		AnchorPoint = Vector2.new(0.5, 0),
-		Position = UDim2.new(0.5, 0, 0, -120),
+		Position = UDim2.new(0.5, 0, 0, -160),
 		Size = UDim2.fromOffset(440, 104),
 		BackgroundColor3 = T.Panel,
+		Visible = false,
 		ZIndex = 60,
 		Parent = gui,
 	}, { Make.Corner(14), new("UIStroke", { Color = T.Purple, Thickness = 2 }) })
@@ -290,13 +302,13 @@ local function buildIncoming()
 		if incomingFrom then
 			Net.Event("Trade"):FireServer("Respond", incomingFrom)
 		end
-		TweenService:Create(incoming, TweenInfo.new(0.25), { Position = UDim2.new(0.5, 0, 0, -120) }):Play()
+		hideIncoming()
 	end)
 	Make.Button("RECHAZAR", T.Danger, { AnchorPoint = Vector2.new(1, 0), Position = UDim2.new(1, -16, 1, -54), Size = UDim2.new(0.5, -24, 0, 42), ZIndex = 61, Parent = incoming }, function()
 		if incomingFrom then
 			Net.Event("Trade"):FireServer("Decline", incomingFrom)
 		end
-		TweenService:Create(incoming, TweenInfo.new(0.25), { Position = UDim2.new(0.5, 0, 0, -120) }):Play()
+		hideIncoming()
 	end)
 end
 
@@ -335,10 +347,11 @@ function TradeUI.Build(screen: ScreenGui, notify: (string, Color3?) -> ())
 		if msg.Type == "Incoming" then
 			incomingFrom = msg.From
 			refs.IncomingText.Text = "🔄 " .. msg.FromName .. " quiere intercambiar"
-			TweenService:Create(incoming, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Position = UDim2.new(0.5, 0, 0, 20) }):Play()
+			incoming.Visible = true
+			TweenService:Create(incoming, TweenInfo.new(0.35, Enum.EasingStyle.Back), { Position = UDim2.new(0.5, 0, 0, 90) }):Play()
 			task.delay(20, function()
 				if incomingFrom == msg.From then
-					TweenService:Create(incoming, TweenInfo.new(0.25), { Position = UDim2.new(0.5, 0, 0, -120) }):Play()
+					hideIncoming()
 				end
 			end)
 		elseif msg.Type == "State" then

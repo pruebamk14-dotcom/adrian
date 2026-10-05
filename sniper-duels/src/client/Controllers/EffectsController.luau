@@ -407,7 +407,9 @@ local function updateGlints()
 			local g = gui :: BillboardGui
 			local toCam = (camPos - lens.Position).Unit
 			-- Solo brilla si el rifle te está apuntando a ti
-			local facing = (rifle :: Model):GetPivot().LookVector:Dot(toCam)
+			local body = (rifle :: Instance):FindFirstChild("Handle") or (rifle :: Instance):FindFirstChild("Receiver")
+			local forward = if body and body:IsA("BasePart") then body.CFrame.LookVector else lens.CFrame.RightVector
+			local facing = forward:Dot(toCam)
 			local strength = math.clamp((facing - 0.8) / 0.2, 0, 1)
 			local flicker = 0.85 + math.sin(os.clock() * 25) * 0.15
 			g.Enabled = strength > 0

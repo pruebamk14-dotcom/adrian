@@ -30,6 +30,34 @@ Todo está escrito en **Luau** y se sincroniza con **Rojo**. No necesita assets 
 - **Intercambios y regalos** de skins y armas de tienda entre jugadores.
 - **Monetización**: pase VIP (x2 monedas y caramelos) y productos de Robux (packs de monedas, pack de caramelos y armas exclusivas).
 
+## Administración (🛡 ADMIN)
+
+- El **creador del juego** (o el dueño del grupo) es siempre *Owner*. Para añadir moderadores, pon sus UserId en `GameConfig.Admins`.
+- **En Roblox Studio todos son admin**, para que puedas testear. Se desactiva con `StudioEveryoneAdmin = false`.
+- Hay un panel en el menú (botón **🛡 ADMIN**) y también comandos de chat que empiezan por `:`:
+
+| Comando | Qué hace |
+| --- | --- |
+| `:coins me 5000` | dar (o quitar con negativo) monedas |
+| `:candies me 500` | dar caramelos |
+| `:level me 20` / `:xp me 1000` | poner nivel / dar XP |
+| `:skins me` / `:weapons me` | todas las skins / todas las armas |
+| `:kick nombre motivo` | expulsar |
+| `:ban nombre 60 motivo` / `:ban nombre perm motivo` | banear 60 min / para siempre (se guarda) |
+| `:unban 123456` | desbanear por UserId |
+| `:announce texto` | anuncio para todo el servidor |
+| `:heal nombre` | curar |
+
+`nombre` puede ser parte del nombre, `me` o `all`.
+
+## Probar con un amigo e ir trabajando juntos
+
+1. **Publica** el juego: en Studio, *File → Publish to Roblox*.
+2. **Para jugar juntos:** en [create.roblox.com](https://create.roblox.com) → tu experiencia → *Settings*, pon el juego en **Public** (o deja *Private* e invita a tu amigo desde *Collaboration*). Tu amigo entra desde el enlace del juego y os retáis en los pads o en RANKED.
+3. **Para editar juntos en Studio:** *Home → Collaborate* (Team Create) e invita a tu amigo. Los dos veis los cambios en directo.
+4. **Si queréis trabajar con este código (GitHub):** tu amigo clona el repo y usa `rojo serve` igual que tú. Cada uno hace cambios en una rama y los juntáis con *pull requests*.
+5. Para probarlo rápido sin publicar: en Studio, *Test → Clients and Servers → 2 jugadores* (abre dos ventanas en tu PC).
+
 ## Monetización: cómo activar los pagos con Robux
 
 1. Publica el juego (*File → Publish to Roblox*).
@@ -113,6 +141,9 @@ Para generar un archivo de lugar: `rojo build -o SniperDuelsElite.rbxl`.
 > Para que se guarden los datos en Studio, activa *Game Settings → Security → Enable Studio Access to API Services*. Sin eso, el juego funciona igual pero los datos solo viven en memoria.
 
 ## Controles
+
+> El duelo es en **primera persona**: **clic derecho** apunta con la mira, **clic izquierdo** dispara. En el lobby la cámara vuelve a tercera persona.
+
 
 | Acción | PC | Mando | Móvil |
 | --- | --- | --- | --- |

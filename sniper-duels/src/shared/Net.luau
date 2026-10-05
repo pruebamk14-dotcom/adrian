@@ -11,7 +11,6 @@ local EVENTS = {
 	"ShotFx", -- S->C: shooterCharacter, origin, direction, weaponId, skinId
 	"HitConfirm", -- S->C: zone, damage, killed, distance
 	"Damaged", -- S->C: fromPosition, damage, health
-	"AmmoUpdate", -- S->C: mag, reloading
 	"DuelState", -- S->C: tabla de estado del duelo
 	"KillFeed", -- S->C: info { KillerName, VictimName, KillerIsMe, VictimIsMe, Headshot, Distance, WeaponId, VictimCharacter }
 	"Notify", -- S->C: texto, color?
@@ -21,6 +20,7 @@ local EVENTS = {
 	"PromptPurchase", -- C->S: clave de producto / "VIP"
 	"Trade", -- C->S: acción, ...
 	"TradeUpdate", -- S->C: estado del intercambio
+	"Announce", -- S->C: anuncio global de un admin
 	"LeaveQueue", -- C->S
 	"QueueState", -- S->C: inQueue, seconds
 	"CrateOpened", -- S->C: skinId, duplicate, refund
@@ -35,6 +35,7 @@ local FUNCTIONS = {
 	"UpdateSettings",
 	"BuyWeapon",
 	"Gift",
+	"AdminCommand",
 }
 
 local Net = {}

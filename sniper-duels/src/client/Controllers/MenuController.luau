@@ -17,6 +17,7 @@ local ClientState = require(script.Parent.Parent.ClientState)
 local Make = require(script.Parent.Parent.UI.Make)
 local ShopUI = require(script.Parent.Parent.UI.ShopUI)
 local TradeUI = require(script.Parent.Parent.UI.TradeUI)
+local AdminUI = require(script.Parent.Parent.UI.AdminUI)
 local HUDController = require(script.Parent.HUDController)
 
 local T = Make.Theme
@@ -96,7 +97,7 @@ end
 -- Tarjeta de perfil ----------------------------------------------------------
 
 local function buildProfileCard()
-	local card = new("Frame", { Name = "Profile", Position = UDim2.fromOffset(16, 16), Size = UDim2.fromOffset(300, 116), BackgroundColor3 = T.Panel, BackgroundTransparency = 0.08, Parent = gui }, {
+	local card = new("Frame", { Name = "Profile", Position = UDim2.fromOffset(16, 70), Size = UDim2.fromOffset(300, 116), BackgroundColor3 = T.Panel, BackgroundTransparency = 0.08, Parent = gui }, {
 		Make.Corner(14),
 		Make.Stroke(T.Stroke, 1.5),
 	})
@@ -178,6 +179,17 @@ local function buildDock()
 		Parent = gui,
 	})
 	refs.Dock = dock
+
+	-- Botón de admin (solo admins; el rango lo pone el servidor)
+	local adminBtn = Make.Button("🛡 ADMIN", Color3.fromRGB(40, 90, 170), { Size = UDim2.fromOffset(110, 56), LayoutOrder = 99, Visible = false, Parent = dock }, function()
+		MenuController.Close()
+		AdminUI.Toggle()
+	end)
+	local function updateAdmin()
+		adminBtn.Visible = AdminUI.IsAdmin()
+	end
+	updateAdmin()
+	player:GetAttributeChangedSignal("SD_Rank"):Connect(updateAdmin)
 end
 
 -- Arsenal --------------------------------------------------------------------
@@ -387,17 +399,19 @@ local function setVisible(visible: boolean)
 		MenuController.Close()
 		ShopUI.Close()
 		TradeUI.CloseAll()
+		AdminUI.Close()
 	end
 end
 
 function MenuController.Start()
-	gui = new("ScreenGui", { Name = "Menu", ResetOnSpawn = false, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 10, Parent = player:WaitForChild("PlayerGui") })
+	gui = new("ScreenGui", { Name = "Menu", ResetOnSpawn = false, IgnoreGuiInset = true, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, DisplayOrder = 10, Parent = player:WaitForChild("PlayerGui") })
 	buildProfileCard()
 	buildDock()
 	buildBotPanel()
 	buildArsenal()
 	ShopUI.Build(gui)
 	TradeUI.Build(gui, HUDController.Toast)
+	AdminUI.Build(gui)
 	buildLeaderboard()
 	buildStats()
 

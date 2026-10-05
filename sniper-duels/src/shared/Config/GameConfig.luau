@@ -102,22 +102,32 @@ local GameConfig = {
 		VIPMultiplier = 2,
 	},
 
+	-- Administración. El creador del juego (o el dueño del grupo) siempre es
+	-- admin. En Roblox Studio todos son admin para poder testear.
+	-- Añade aquí UserIds de tus amigos/moderadores: [12345678] = "Mod"
+	Admins = {} :: { [number]: string },
+	StudioEveryoneAdmin = true,
+
 	-- Intercambios
 	TradeConfirmTime = 4, -- s de cuenta atrás tras aceptar ambos (anti-estafa)
 	TradeMaxItems = 8,
 
-	-- Sonidos (rbxassetid://...). Vacío = desactivado. Pon tus propios IDs.
+	-- Sonidos (rbxassetid://...). Vacío = desactivado. Los incluidos son de la
+	-- librería pública de la Creator Store; cámbialos por los que quieras.
 	Sounds = {
-		Fire = "",
+		Fire = "rbxassetid://9114726695",
 		Bolt = "",
-		Reload = "",
+		Reload = "rbxassetid://138084889",
 		Hitmarker = "rbxasset://sounds/electronicpingshort.wav",
 		Headshot = "",
 		ScopeIn = "",
 		Countdown = "rbxasset://sounds/button.wav",
 		RoundWin = "",
 		RoundLose = "",
-		Thunder = "",
+		Thunder = "rbxassetid://9126069842",
+		Ambience = "rbxassetid://9112775175", -- Eerie Ambience 1 (SFX)
+		GhostWhoosh = "rbxassetid://9120732173",
+		Jumpscare = "rbxassetid://9125712561",
 	},
 }
 

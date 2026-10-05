@@ -44,41 +44,42 @@ function Environment.Apply()
 	local clouds = get("Clouds", terrain) :: Clouds
 
 	if halloween then
-		Lighting.ClockTime = 18.35
-		Lighting.GeographicLatitude = 35
-		Lighting.Brightness = 2.2
-		Lighting.Ambient = Color3.fromRGB(45, 30, 60)
-		Lighting.OutdoorAmbient = Color3.fromRGB(110, 80, 125)
-		Lighting.ColorShift_Top = Color3.fromRGB(255, 140, 60)
-		Lighting.ColorShift_Bottom = Color3.fromRGB(80, 40, 120)
-		Lighting.ExposureCompensation = 0.15
+		-- Atardecer de Halloween pero CLARO: se tiene que ver bien a 300 studs
+		Lighting.ClockTime = 17.6
+		Lighting.GeographicLatitude = 30
+		Lighting.Brightness = 3.2
+		Lighting.Ambient = Color3.fromRGB(95, 80, 105)
+		Lighting.OutdoorAmbient = Color3.fromRGB(165, 140, 170)
+		Lighting.ColorShift_Top = Color3.fromRGB(255, 170, 90)
+		Lighting.ColorShift_Bottom = Color3.fromRGB(110, 70, 140)
+		Lighting.ExposureCompensation = 0.45
 
-		atmo.Density = 0.36
-		atmo.Offset = 0.1
-		atmo.Haze = 2.2
-		atmo.Glare = 0.6
-		atmo.Color = Color3.fromRGB(150, 100, 140)
-		atmo.Decay = Color3.fromRGB(80, 40, 90)
+		atmo.Density = 0.24
+		atmo.Offset = 0.05
+		atmo.Haze = 1.2
+		atmo.Glare = 0.4
+		atmo.Color = Color3.fromRGB(200, 150, 170)
+		atmo.Decay = Color3.fromRGB(120, 70, 120)
 
-		cc.TintColor = Color3.fromRGB(255, 238, 225)
-		cc.Contrast = 0.12
-		cc.Saturation = 0.08
-		cc.Brightness = 0.02
+		cc.TintColor = Color3.fromRGB(255, 242, 232)
+		cc.Contrast = 0.1
+		cc.Saturation = 0.12
+		cc.Brightness = 0.06
 
-		bloom.Intensity = 0.9
-		bloom.Size = 32
-		bloom.Threshold = 1.3
+		bloom.Intensity = 0.7
+		bloom.Size = 28
+		bloom.Threshold = 1.5
 
-		rays.Intensity = 0.06
+		rays.Intensity = 0.08
 		rays.Spread = 0.6
 
-		clouds.Cover = 0.62
-		clouds.Density = 0.45
-		clouds.Color = Color3.fromRGB(110, 80, 120)
+		clouds.Cover = 0.55
+		clouds.Density = 0.35
+		clouds.Color = Color3.fromRGB(150, 110, 150)
 
-		terrain:SetMaterialColor(Enum.Material.Grass, Color3.fromRGB(62, 78, 46))
+		terrain:SetMaterialColor(Enum.Material.Grass, Color3.fromRGB(78, 98, 56))
 		terrain:SetMaterialColor(Enum.Material.LeafyGrass, Color3.fromRGB(76, 70, 40))
-		terrain:SetMaterialColor(Enum.Material.Mud, Color3.fromRGB(58, 44, 36))
+		terrain:SetMaterialColor(Enum.Material.Mud, Color3.fromRGB(84, 66, 52))
 		terrain:SetMaterialColor(Enum.Material.Ground, Color3.fromRGB(78, 62, 48))
 		terrain:SetMaterialColor(Enum.Material.Rock, Color3.fromRGB(80, 78, 84))
 		terrain:SetMaterialColor(Enum.Material.Slate, Color3.fromRGB(70, 68, 78))

@@ -19,21 +19,31 @@ local LeaderboardService = require(Services.LeaderboardService)
 local BotService = require(Services.BotService)
 local MonetizationService = require(Services.MonetizationService)
 local TradeService = require(Services.TradeService)
+local AdminService = require(Services.AdminService)
 
 Players.CharacterAutoLoads = false
 Players.RespawnTime = 2
 
-ArenaService.Start()
-HitboxHistory.Start()
-CombatService.Start()
-DuelService.Start()
-BotService.Start()
-MatchmakingService.Start()
-ShopService.Start()
-LeaderboardService.Start()
-MonetizationService.Start()
-TradeService.Start()
-DataService.Start()
+-- Cada servicio arranca protegido: un fallo no tumba el resto del juego
+for _, entry in {
+	{ "Admin", AdminService }, -- primero: echa a los baneados cuanto antes
+	{ "Arena", ArenaService },
+	{ "HitboxHistory", HitboxHistory },
+	{ "Combat", CombatService },
+	{ "Duel", DuelService },
+	{ "Bot", BotService },
+	{ "Matchmaking", MatchmakingService },
+	{ "Shop", ShopService },
+	{ "Leaderboard", LeaderboardService },
+	{ "Monetization", MonetizationService },
+	{ "Trade", TradeService },
+	{ "Data", DataService },
+} do
+	local ok, err = xpcall((entry[2] :: any).Start, debug.traceback)
+	if not ok then
+		warn("[SniperDuels] Error al iniciar " .. entry[1] .. "Service:\n" .. tostring(err))
+	end
+end
 
 -- Personajes del lobby: reaparecer al morir si no está en un duelo
 local function hookCharacter(player: Player, character: Model)

@@ -76,26 +76,31 @@ local function isFiniteVector(v: any): boolean
 	return true
 end
 
+-- El estado del arma se publica como atributos del Player: Roblox los
+-- replica siempre y el cliente puede leerlos en cualquier momento (no se
+-- pierden aunque el script del cliente arranque tarde).
 local function pushAmmo(player: Combatant)
 	local s = states[player]
 	if s and isPlayer(player) then
-		Net.Event("AmmoUpdate"):FireClient(player, s.Mag, s.Reloading, s.WeaponId)
+		player:SetAttribute("SD_Weapon", s.WeaponId)
+		player:SetAttribute("SD_Mag", s.Mag)
+		player:SetAttribute("SD_Reloading", s.Reloading)
 	end
 end
 
+-- Brazo izquierdo hacia delante sujetando el guardamanos (el derecho lo
+-- coloca la animación de herramienta)
 local function poseArms(character: Model, raised: boolean)
-	for _, info in { { "RightUpperArm", "RightShoulder", 15 }, { "LeftUpperArm", "LeftShoulder", -40 } } do
-		local arm = character:FindFirstChild(info[1])
-		local motor = arm and arm:FindFirstChild(info[2]) :: Motor6D?
-		if motor then
-			local original = motor:GetAttribute("OriginalC0") :: CFrame?
-			if not original then
-				original = motor.C0
-				motor:SetAttribute("OriginalC0", original)
-			end
-			local o = original :: CFrame
-			motor.C0 = if raised then o * CFrame.fromEulerAnglesYXZ(math.rad(88), math.rad(info[3]), 0) else o
+	local arm = character:FindFirstChild("LeftUpperArm")
+	local motor = arm and arm:FindFirstChild("LeftShoulder") :: Motor6D?
+	if motor then
+		local original = motor:GetAttribute("OriginalC0") :: CFrame?
+		if not original then
+			original = motor.C0
+			motor:SetAttribute("OriginalC0", original)
 		end
+		local o = original :: CFrame
+		motor.C0 = if raised then o * CFrame.fromEulerAnglesYXZ(math.rad(80), math.rad(-38), 0) else o
 	end
 end
 
@@ -109,17 +114,25 @@ local function attachGun(player: Combatant)
 	if old then
 		old:Destroy()
 	end
-	local torso = (character:FindFirstChild("UpperTorso") or character:FindFirstChild("Torso")) :: BasePart?
-	if not torso then
-		return
+	if isPlayer(player) then
+		local backpack = player:FindFirstChildOfClass("Backpack")
+		local inPack = backpack and backpack:FindFirstChild("Rifle")
+		if inPack then
+			inPack:Destroy()
+		end
 	end
-	local gun = GunBuilder.Build(s.WeaponId, s.SkinId)
-	gun:PivotTo(torso.CFrame * CFrame.new(0.55, 0.35, -1.6))
-	local weld = Instance.new("WeldConstraint")
-	weld.Part0 = torso
-	weld.Part1 = gun.PrimaryPart
-	weld.Parent = gun
-	gun.Parent = character
+	local tool = GunBuilder.BuildTool(s.WeaponId, s.SkinId)
+	tool.Parent = character -- al ponerlo en el personaje se equipa en la mano
+	-- Si el jugador intenta guardarlo (tecla 1 / retroceso), se vuelve a equipar
+	tool.AncestryChanged:Connect(function(_, parent)
+		if parent and parent:IsA("Backpack") and states[player] == s and character.Parent then
+			task.defer(function()
+				if tool.Parent and tool.Parent:IsA("Backpack") then
+					tool.Parent = character
+				end
+			end)
+		end
+	end)
 	poseArms(character, true)
 end
 
@@ -156,7 +169,9 @@ function CombatService.Disarm(player: Combatant)
 		poseArms(character, false)
 	end
 	if isPlayer(player) then
-		Net.Event("AmmoUpdate"):FireClient(player, -1, false, "")
+		player:SetAttribute("SD_Weapon", "")
+		player:SetAttribute("SD_Mag", 0)
+		player:SetAttribute("SD_Reloading", false)
 	end
 end
 

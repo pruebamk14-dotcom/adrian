@@ -47,7 +47,7 @@ local function wedge(model: Model, name: string, size: Vector3, offset: CFrame, 
 	return p
 end
 
-function GunBuilder.ApplySkin(model: Model, skinId: string)
+function GunBuilder.ApplySkin(model: Instance, skinId: string)
 	local s = Skins.Get(skinId)
 	for _, d in model:GetDescendants() do
 		if d:IsA("BasePart") then
@@ -74,7 +74,7 @@ function GunBuilder.ApplySkin(model: Model, skinId: string)
 		glow:Destroy()
 	end
 	if s.Glow then
-		local body = model:FindFirstChild("Receiver") :: BasePart?
+		local body = (model:FindFirstChild("Receiver") or model:FindFirstChild("Handle")) :: BasePart?
 		if body then
 			local light = Instance.new("PointLight")
 			light.Name = "SkinGlow"
@@ -156,6 +156,30 @@ function GunBuilder.Build(weaponId: string, skinId: string): Model
 	model:SetAttribute("WeaponId", w.Id)
 	model:SetAttribute("SkinId", skinId)
 	return model
+end
+
+-- Versión Tool para el personaje: se agarra con la mano derecha (RightGrip)
+-- y la animación por defecto "toolnone" levanta el brazo apuntando al frente.
+GunBuilder.GripOffset = CFrame.new(0, -0.42, 0.55) -- empuñadura respecto al receiver
+
+function GunBuilder.BuildTool(weaponId: string, skinId: string): Tool
+	local model = GunBuilder.Build(weaponId, skinId)
+	local tool = Instance.new("Tool")
+	tool.Name = "Rifle"
+	tool.RequiresHandle = true
+	tool.CanBeDropped = false
+	tool.ManualActivationOnly = true
+	tool.ToolTip = ""
+	tool.Grip = GunBuilder.GripOffset
+	local receiver = model.PrimaryPart :: BasePart
+	for _, c in model:GetChildren() do
+		c.Parent = tool
+	end
+	receiver.Name = "Handle"
+	tool:SetAttribute("WeaponId", model:GetAttribute("WeaponId"))
+	tool:SetAttribute("SkinId", skinId)
+	model:Destroy()
+	return tool
 end
 
 return GunBuilder

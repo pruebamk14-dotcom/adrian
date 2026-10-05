@@ -30,8 +30,8 @@ local memoryStore: { [string]: any } = {}
 local function template()
 	return {
 		Version = 1,
-		Coins = 250,
-		Candies = 0,
+		Coins = 1000, -- regalo de bienvenida: da para abrir cajas desde el principio
+		Candies = 200,
 		XP = 0,
 		Level = 1,
 		Elo = GameConfig.StartingElo,
