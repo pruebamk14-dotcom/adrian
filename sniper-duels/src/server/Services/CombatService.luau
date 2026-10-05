@@ -247,6 +247,28 @@ function CombatService.SetCanFire(player: Combatant, canFire: boolean)
 	end
 end
 
+-- Cambiar de arma/skin en mitad de un duelo: reconstruir las herramientas
+-- con lo equipado, sin tocar el permiso de disparo
+function CombatService.Rearm(player: Combatant)
+	local s = states[player]
+	if not s or not isPlayer(player) then
+		return
+	end
+	local data = DataService.Get(player)
+	if not data then
+		return
+	end
+	local w = Weapons.Get(data.Equipped.Weapon)
+	s.WeaponId = w.Id
+	s.SkinId = data.Equipped.Skin or "Default"
+	s.Mag = w.MagSize
+	s.Reloading = false
+	s.ReloadToken += 1
+	s.Slot = 1
+	attachGun(player)
+	pushAmmo(player)
+end
+
 -- Recarga instantánea entre rondas + reponer arma al nuevo personaje
 function CombatService.ResetForRound(player: Combatant)
 	local s = states[player]

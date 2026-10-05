@@ -11,6 +11,7 @@ local Net = require(Shared.Net)
 
 local DataService = require(script.Parent.DataService)
 local DuelService = require(script.Parent.DuelService)
+local CombatService = require(script.Parent.CombatService)
 
 local ShopService = {}
 local rng = Random.new()
@@ -54,11 +55,11 @@ function ShopService.Start()
 		if not d or type(skinId) ~= "string" or not d.Inventory.Skins[skinId] or not Skins.List[skinId] then
 			return false
 		end
-		if DuelService.IsBusy(player) then
-			return false
-		end
 		d.Equipped.Skin = skinId
 		DataService.Push(player)
+		if DuelService.IsBusy(player) then
+			CombatService.Rearm(player)
+		end
 		return true
 	end
 
@@ -86,11 +87,14 @@ function ShopService.Start()
 			return false
 		end
 		local w = Weapons.List[weaponId]
-		if not w or not Weapons.Owns(d, weaponId) or DuelService.IsBusy(player) then
+		if not w or not Weapons.Owns(d, weaponId) then
 			return false
 		end
 		d.Equipped.Weapon = weaponId
 		DataService.Push(player)
+		if DuelService.IsBusy(player) then
+			CombatService.Rearm(player)
+		end
 		return true
 	end
 

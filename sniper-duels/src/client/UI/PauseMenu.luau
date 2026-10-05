@@ -49,8 +49,12 @@ function PauseMenu.Open()
 	root.Visible = true
 	ClientState.MenuOpen = true
 	refresh()
+	-- En primera persona Roblox fija el ratón en el centro: alejar la cámara
+	-- para poder pulsar los botones
 	pcall(function()
 		player.CameraMode = Enum.CameraMode.Classic
+		player.CameraMinZoomDistance = 8
+		player.CameraMaxZoomDistance = 12
 		UserInputService.MouseBehavior = Enum.MouseBehavior.Default
 		UserInputService.MouseIconEnabled = true
 	end)
@@ -64,8 +68,15 @@ function PauseMenu.Close()
 	ClientState.MenuOpen = false
 	if ClientState.Armed then
 		pcall(function()
+			player.CameraMinZoomDistance = 0.5
+			player.CameraMaxZoomDistance = 0.5
 			player.CameraMode = Enum.CameraMode.LockFirstPerson
 			UserInputService.MouseIconEnabled = false
+		end)
+	else
+		pcall(function()
+			player.CameraMinZoomDistance = 0.5
+			player.CameraMaxZoomDistance = 20
 		end)
 	end
 end

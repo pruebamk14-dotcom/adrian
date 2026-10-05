@@ -370,7 +370,7 @@ local function onDuelState(state: any)
 
 	refs.Top.Visible = state.State ~= "Ended"
 	refs.Me.Label.Text = player.DisplayName
-	refs.Opp.Label.Text = state.OpponentName
+	refs.Opp.Label.Text = state.OpponentName .. (if string.find(state.OpponentName, "Práctica") then " (no dispara)" else "")
 	setPips(refs.Me, state.MyScore, state.RoundsToWin)
 	setPips(refs.Opp, state.OppScore, state.RoundsToWin)
 	refs.RoundLabel.Text = if state.Ranked then string.format("RANKED · R%d", math.max(state.Round, 1)) else string.format("RONDA %d", math.max(state.Round, 1))

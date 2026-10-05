@@ -47,6 +47,13 @@ local List: { [string]: Skin } = {
 	Plasma = skin("Plasma", "Plasma", "Legendario", Color3.fromRGB(0, 230, 255), Color3.fromRGB(0, 40, 80), Enum.Material.ForceField, true),
 	Inferno = skin("Inferno", "Infierno", "Mítico", Color3.fromRGB(255, 80, 0), Color3.fromRGB(60, 0, 0), Enum.Material.Neon, true),
 
+	BlueCamo = skin("BlueCamo", "Camo azul", "Raro", Color3.fromRGB(40, 90, 200), Color3.fromRGB(15, 25, 60), Enum.Material.Fabric),
+	GreenCamo = skin("GreenCamo", "Camo verde", "Raro", Color3.fromRGB(70, 110, 55), Color3.fromRGB(30, 45, 25), Enum.Material.Fabric),
+	PinkCamo = skin("PinkCamo", "Camo rosa", "Épico", Color3.fromRGB(235, 90, 170), Color3.fromRGB(80, 20, 60), Enum.Material.Fabric),
+	Glacial = skin("Glacial", "Glacial", "Épico", Color3.fromRGB(150, 210, 255), Color3.fromRGB(40, 60, 90), Enum.Material.Ice),
+	Dynasty = skin("Dynasty", "Dinastía olvidada", "Legendario", Color3.fromRGB(225, 225, 230), Color3.fromRGB(210, 120, 20), Enum.Material.Marble),
+	Festive = skin("Festive", "Festivo", "Legendario", Color3.fromRGB(190, 30, 40), Color3.fromRGB(30, 110, 50), Enum.Material.Fabric, true),
+
 	-- Halloween (caja de caramelos)
 	Pumpkin = skin("Pumpkin", "Calabaza", "Común", Color3.fromRGB(235, 120, 20), Color3.fromRGB(30, 20, 10), Enum.Material.SmoothPlastic, false, "Halloween"),
 	Spiderweb = skin("Spiderweb", "Telaraña", "Común", Color3.fromRGB(20, 20, 24), Color3.fromRGB(200, 200, 210), Enum.Material.Fabric, false, "Halloween"),

@@ -689,6 +689,28 @@ local function update(dt: number)
 
 	local planar = if root then Vector3.new(root.AssemblyLinearVelocity.X, 0, root.AssemblyLinearVelocity.Z).Magnitude else 0
 
+	-- En primera persona Roblox sigue dibujando la herramienta del personaje y
+	-- sus brazos: se ocultan solo para este cliente (el viewmodel los sustituye)
+	local char = player.Character
+	if char and not inputBlocked() then
+		for _, name in { "Rifle", "Knife" } do
+			local tool = char:FindFirstChild(name)
+			if tool then
+				for _, part in tool:GetDescendants() do
+					if part:IsA("BasePart") then
+						part.LocalTransparencyModifier = 1
+					end
+				end
+			end
+		end
+		for _, name in { "RightUpperArm", "RightLowerArm", "RightHand", "LeftUpperArm", "LeftLowerArm", "LeftHand", "Right Arm", "Left Arm" } do
+			local part = char:FindFirstChild(name)
+			if part and part:IsA("BasePart") then
+				part.LocalTransparencyModifier = 1
+			end
+		end
+	end
+
 	-- Viewmodel activo
 	if viewmodel then
 		local vm = viewmodel :: Model
@@ -753,6 +775,13 @@ function WeaponController.Start()
 	end)
 	-- Vía 3: sondeo en update() si nada de lo anterior llegó
 	task.defer(syncFromAttributes)
+	-- Cambio de skin mientras se está armado: reconstruir el viewmodel
+	ClientState.DataChanged:Connect(function(data)
+		if ClientState.Armed and data and data.Equipped and data.Equipped.Skin ~= equippedSkin then
+			buildViewmodels()
+		end
+	end)
+
 	-- Vía 4: al empezar cada ronda, preguntar al servidor directamente
 	ClientState.DuelChanged:Connect(function(state)
 		if state and (state.State == "Countdown" or state.State == "Live") then

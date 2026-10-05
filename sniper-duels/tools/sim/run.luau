@@ -326,6 +326,18 @@ M.Run(0.5)
 check("ranura 2 en el cliente", ClientState.Slot == 2)
 check("ranura 2 en el servidor (atributo)", p1:GetAttribute("SD_Slot") == 2, tostring(p1:GetAttribute("SD_Slot")))
 check("cuchillo en la mano", p1.Character ~= nil and p1.Character:FindFirstChild("Knife") ~= nil)
+check("rifle guardado al sacar el cuchillo", p1.Character ~= nil and p1.Character:FindFirstChild("Rifle") == nil)
+-- Cambiar de skin y de arma en mitad del duelo: se aplica al instante
+check("equipar skin en duelo", remotes.EquipSkin:InvokeServer("Gold") == true)
+M.Run(0.3)
+local rifleTool = p1.Character and p1.Character:FindFirstChild("Rifle")
+check("rifle reconstruido con la skin nueva", rifleTool ~= nil and rifleTool:GetAttribute("SkinId") == "Gold", rifleTool and tostring(rifleTool:GetAttribute("SkinId")))
+check("equipar arma en duelo", remotes.EquipWeapon:InvokeServer("Viper") == true)
+M.Run(0.3)
+check("arma cambiada en el servidor", p1:GetAttribute("SD_Weapon") == "Viper", tostring(p1:GetAttribute("SD_Weapon")))
+check("arma cambiada en el cliente", ClientState.WeaponId == "Viper")
+M.FireAction("SD_Slot2", Enum.UserInputState.Begin, Enum.UserInputType.Keyboard)
+M.Run(0.3)
 check("viewmodel del cuchillo", workspace.CurrentCamera:FindFirstChild("KnifeViewmodel") ~= nil)
 M.Run(1.2) -- que gire la mariposa en reposo
 -- Rival nuevo (el anterior murió): esperar a la siguiente ronda Live
