@@ -208,8 +208,10 @@ if bot and myHead and botTorso then
 		bot.HumanoidRootPart.Anchored = false
 		bot:PivotTo(base * CFrame.new(pair[2]))
 		bot.HumanoidRootPart.Anchored = true
+		-- Libre tanto en línea recta como por encima (la bala hace un arco)
 		local hit = workspace:Raycast(myHead.Position, botTorso.Position - myHead.Position, params)
-		if not hit then
+		local hit2 = workspace:Raycast(myHead.Position, botTorso.Position + Vector3.new(0, 2.5, 0) - myHead.Position, params)
+		if not hit and not hit2 then
 			placed = true
 			break
 		end
@@ -238,6 +240,7 @@ for i = 1, 18 do
 	end
 end
 check("mira puesta (atributo Scoped)", p1.Character:GetAttribute("Scoped") == true, "ScopeState recibidos: " .. table.concat(scopeCalls, ","))
+check("la mira no parpadea al mantenerla (un solo ScopeState)", #scopeCalls == 1, table.concat(scopeCalls, ","))
 do
 	local scopes = {}
 	for _, c in hud:GetChildren() do
@@ -315,7 +318,7 @@ M.FireAction("SD_Fire", Enum.UserInputState.Begin, Enum.UserInputType.MouseButto
 M.FireAction("SD_Fire", Enum.UserInputState.End, Enum.UserInputType.MouseButton1)
 M.Run(1.5)
 check("disparo enviado al servidor y procesado (munición baja)", p1:GetAttribute("SD_Mag") == 4, tostring(p1:GetAttribute("SD_Mag")))
-check("impacto confirmado en el bot", #hits > 0, if #hits > 0 then string.format("%s %d studs", hits[1][1], hits[1][4]) else "sin HitConfirm")
+check("impacto confirmado en el bot", #hits > 0, if #hits > 0 then string.format("%s %d studs", hits[1][1], hits[1][4]) else ("sin HitConfirm; " .. tostring(ClientState.LastShot) .. "; scoped=" .. tostring(ClientState.Scoped) .. " sway=" .. tostring(ClientState.Sway)))
 check("sin errores al disparar", #M.Errors == errorsBefore)
 -- Recargar
 -- Cuchillo (ranura 2), agacharse, menú y recompensa diaria

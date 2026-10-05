@@ -78,6 +78,8 @@ type Bot = {
 	PathDeadline: number,
 	LastHealth: number,
 	StrafeDir: number,
+	HuntTarget: Vector3?,
+	RoundStart: number?,
 	Tracks: { [string]: AnimationTrack },
 	Home: CFrame?,
 }
@@ -282,6 +284,8 @@ function BotService.Respawn(bot: Bot, cf: CFrame)
 	bot.Path = {}
 	bot.PathTarget = nil
 	bot.LastHealth = hum.Health
+	bot.HuntTarget = nil
+	bot.RoundStart = os.clock() + 3 -- la cuenta atrás
 	bot.CoverPoints = computeCoverPoints(bot, cf)
 	bot.Tracks = {}
 	local animator = hum:FindFirstChildOfClass("Animator") or Instance.new("Animator", hum)
@@ -396,17 +400,42 @@ local function goTo(bot: Bot, hum: Humanoid, root: BasePart, target: Vector3, no
 	return false
 end
 
+-- Posición actual del rival (en un duelo de francotiradores se intuye dónde
+-- está; el bot no hace trampa con la puntería, solo con la búsqueda)
+local function enemyPosition(bot: Bot): Vector3?
+	local target = CombatService.TargetResolver(bot)[1]
+	local root = target and target.Character and target.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	return root and root.Position
+end
+
+-- ¿Desde este punto se ve al rival? (raycast a la altura de la cabeza)
+local function hasLineFrom(bot: Bot, point: Vector3, enemy: Vector3): boolean
+	local params = losParams(bot)
+	local from = point + Vector3.new(0, 4.5, 0)
+	local to = enemy + Vector3.new(0, 1.5, 0)
+	local hit = workspace:Raycast(from, to - from, params)
+	if not hit then
+		return true
+	end
+	local target = CombatService.TargetResolver(bot)[1]
+	return target ~= nil and target.Character ~= nil and hit.Instance:IsDescendantOf(target.Character)
+end
+
 local function pickCover(bot: Bot): { Cover: Vector3, Peek: Vector3 }?
 	if #bot.CoverPoints == 0 then
 		return nil
 	end
-	-- Preferir coberturas no muy lejanas a la actual
+	local enemy = enemyPosition(bot)
+	local root = bot.Character and bot.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
+	-- Preferir coberturas cercanas cuyo punto de asomarse SÍ ve al rival
 	local best, bestScore = nil, math.huge
-	for _ = 1, 6 do
+	for _ = 1, 10 do
 		local c = bot.CoverPoints[rng:NextInteger(1, #bot.CoverPoints)]
-		local root = bot.Character and bot.Character:FindFirstChild("HumanoidRootPart") :: BasePart?
 		local dist = if root then (c.Cover - root.Position).Magnitude else 0
-		local score = dist + rng:NextNumber(0, 40)
+		local score = dist + rng:NextNumber(0, 30)
+		if enemy and not hasLineFrom(bot, c.Peek, enemy) then
+			score += 400 -- asomarse ahí no sirve de nada
+		end
 		if c ~= bot.CurrentCover and score < bestScore then
 			best, bestScore = c, score
 		end
@@ -432,6 +461,7 @@ local function think(bot: Bot, now: number, dt: number)
 		return
 	end
 	local diff = bot.Difficulty
+	char:SetAttribute("AIMode", bot.Mode) -- visible en el Explorador para depurar
 	local w = Weapons.Get(state.WeaponId)
 
 	-- ¿Le han dado? -> abandonar posición y moverse a otra cobertura
@@ -554,18 +584,26 @@ local function think(bot: Bot, now: number, dt: number)
 	end
 	local cover = bot.CurrentCover
 
-	-- Mucho tiempo sin verte: ir a buscarte hacia donde te vio por última vez
-	if now - bot.LastSeenTime > 10 and bot.LastSeenPos and rng:NextNumber() < 0.02 then
+	-- Un rato sin verte: salir a buscarte hacia donde estás (no se queda escondido)
+	local enemyPos = enemyPosition(bot)
+	local idleFor = now - math.max(bot.LastSeenTime, bot.RoundStart or 0)
+	if bot.Mode ~= "Hunt" and enemyPos and idleFor > (if diff.Reaction < 0.6 then 4 else 7) then
 		bot.Mode = "Hunt"
-		bot.ModeUntil = now + 6
+		bot.ModeUntil = now + 5
+		bot.HuntTarget = enemyPos
 	end
 
-	if bot.Mode == "Hunt" and bot.LastSeenPos then
-		local dest = root.Position:Lerp(Vector3.new(bot.LastSeenPos.X, root.Position.Y, bot.LastSeenPos.Z), 0.4)
+	if bot.Mode == "Hunt" and (bot.HuntTarget or bot.LastSeenPos) then
+		local goal = (bot.HuntTarget or bot.LastSeenPos) :: Vector3
+		-- Avanzar hacia el rival, en diagonal para no ir en línea recta
+		local side = (bot.Home :: CFrame).RightVector * (if bot.StrafeDir > 0 then 25 else -25)
+		local dest = root.Position:Lerp(Vector3.new(goal.X, root.Position.Y, goal.Z) + side, 0.35)
 		goTo(bot, hum, root, dest, now)
 		playAnim(bot, "Run")
 		if now > bot.ModeUntil then
 			bot.Mode = "Cover"
+			bot.HuntTarget = nil
+			bot.LastSeenTime = now -- reiniciar el contador de búsqueda
 			bot.CurrentCover = pickCover(bot)
 		end
 		return

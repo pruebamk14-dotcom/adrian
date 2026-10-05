@@ -30,7 +30,7 @@ local toggleBtn: TextButton
 
 local function settings()
 	local d = ClientState.Data
-	return d and d.Settings or { Sensitivity = 1, ScopeSensitivity = 0.55, ToggleScope = false }
+	return d and d.Settings or { Sensitivity = 1, ScopeSensitivity = 1, ToggleScope = false }
 end
 
 local function refresh()

@@ -78,7 +78,7 @@ scopeBlur.Parent = camera
 
 local function settings()
 	local d = ClientState.Data
-	return d and d.Settings or { Sensitivity = 1, ScopeSensitivity = 0.55, ToggleScope = false }
+	return d and d.Settings or { Sensitivity = 1, ScopeSensitivity = 1, ToggleScope = false }
 end
 
 local function humanoid(): Humanoid?
@@ -231,7 +231,8 @@ local function fire()
 	-- El vaivén de la mira desvía el tiro igual que mueve la retícula
 	local sway = ClientState.Sway or Vector2.zero
 	if ClientState.Scoped and (sway.X ~= 0 or sway.Y ~= 0) then
-		aimDir = (CFrame.lookAt(Vector3.zero, aimDir) * CFrame.Angles(math.rad(sway.Y), math.rad(sway.X), 0)).LookVector
+		-- Mismo sentido que la retícula: +X a la derecha, +Y hacia arriba
+		aimDir = (CFrame.lookAt(Vector3.zero, aimDir) * CFrame.Angles(math.rad(sway.Y), math.rad(-sway.X), 0)).LookVector
 	end
 	local direction = Ballistics.ApplySpread(aimDir, spread, rng)
 	Net.Event("Fire"):FireServer(origin, direction, workspace:GetServerTimeNow())
@@ -665,8 +666,19 @@ local function update(dt: number)
 	local canScope = wantScope and not knife and not ClientState.Reloading and hum ~= nil and hum.Health > 0 and not inputBlocked()
 	local target = if canScope then 1 else 0
 	local rate = dt / math.max(weapon.ScopeInTime, 0.01)
-	ClientState.ScopeProgress = math.clamp(ClientState.ScopeProgress + (if target > ClientState.ScopeProgress then rate else -rate * 1.5), 0, 1)
-	setScoped(ClientState.ScopeProgress >= 0.92)
+	-- Avanzar hacia el objetivo sin pasarse (antes, al llegar a 1 bajaba y
+	-- volvía a subir cada fotograma: la mira parpadeaba)
+	if target > ClientState.ScopeProgress then
+		ClientState.ScopeProgress = math.min(ClientState.ScopeProgress + rate, target)
+	elseif target < ClientState.ScopeProgress then
+		ClientState.ScopeProgress = math.max(ClientState.ScopeProgress - rate * 1.5, target)
+	end
+	-- Histéresis: evita que la mira se ponga y se quite en bucle (parpadeo)
+	if not ClientState.Scoped and ClientState.ScopeProgress >= 0.95 then
+		setScoped(true)
+	elseif ClientState.Scoped and ClientState.ScopeProgress <= 0.6 then
+		setScoped(false)
+	end
 
 	-- FOV
 	local zoomFov = weapon.ZoomFOV[math.clamp(zoomIndex, 1, #weapon.ZoomFOV)]
@@ -675,11 +687,13 @@ local function update(dt: number)
 	local fov = BASE_FOV + (zoomFov - BASE_FOV) * eased
 	fovKick = math.max(0, fovKick - dt * 30)
 	camera.FieldOfView = fov + fovKick + (if sliding then 6 else 0)
-	scopeBlur.Size = math.sin(math.clamp(p, 0, 1) * math.pi) * 10
+	scopeBlur.Size = 0 -- el desenfoque hacía parpadear la imagen al apuntar
 
 	-- Sensibilidad
 	local s = settings()
-	local sens = s.Sensitivity * (if ClientState.Scoped then s.ScopeSensitivity * (zoomFov / 30) else 1)
+	-- Con mira, la sensibilidad baja en proporción al zoom (misma sensación en todos los aumentos)
+	local zoomRatio = math.tan(math.rad(camera.FieldOfView / 2)) / math.tan(math.rad(BASE_FOV / 2))
+	local sens = s.Sensitivity * (if ClientState.ScopeProgress > 0.5 then s.ScopeSensitivity * zoomRatio else 1)
 	pcall(function()
 		UserInputService.MouseDeltaSensitivity = math.clamp(sens, 0.02, 4)
 	end)
@@ -741,7 +755,8 @@ local function update(dt: number)
 	-- cámara de Roblox y da saltos). El vaivén se aplica a la retícula y al
 	-- viewmodel; el servidor/cliente lo tienen en cuenta en la dispersión.
 	local t = os.clock()
-	local swayAmt = weapon.Sway * (if breathing then 0.12 elseif exhausted then 2.2 else 1) * ClientState.ScopeProgress
+	-- Vaivén suave y pequeño (≈0,1-0,2°): se nota pero no impide acertar
+	local swayAmt = weapon.Sway * 0.3 * (if breathing then 0.1 elseif exhausted then 2 else 1) * ClientState.ScopeProgress
 	local sx = (math.noise(t * 0.45, 0, 1.3) * 2 + math.sin(t * 1.1) * 0.6) * swayAmt
 	local sy = (math.noise(0, t * 0.45, 7.7) * 2 + math.sin(t * 0.8) * 0.4) * swayAmt
 	ClientState.Sway = Vector2.new(sx, sy)

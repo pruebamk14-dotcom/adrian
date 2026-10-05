@@ -73,6 +73,71 @@ local function buildScope(parent: Instance)
 			}),
 		}),
 	})
+	-- Cristal: tinte azulado, reflejo curvo, borde iluminado y anillo interior
+	new("Frame", {
+		Name = "GlassTint",
+		Size = UDim2.fromScale(1, 1),
+		BackgroundColor3 = Color3.fromRGB(120, 190, 255),
+		BackgroundTransparency = 0.93,
+		BorderSizePixel = 0,
+		Parent = lens,
+	}, {
+		new("UICorner", { CornerRadius = UDim.new(0.5, 0) }),
+		new("UIGradient", {
+			Rotation = 135,
+			Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 0.2), NumberSequenceKeypoint.new(0.5, 0.9), NumberSequenceKeypoint.new(1, 0.4) }),
+		}),
+	})
+	local reflection = new("Frame", {
+		Name = "Reflection",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.32, 0.26),
+		Size = UDim2.fromScale(0.42, 0.16),
+		Rotation = -35,
+		BackgroundColor3 = Color3.new(1, 1, 1),
+		BackgroundTransparency = 0.88,
+		BorderSizePixel = 0,
+		Parent = lens,
+	}, {
+		new("UICorner", { CornerRadius = UDim.new(0.5, 0) }),
+		new("UIGradient", { Transparency = NumberSequence.new({ NumberSequenceKeypoint.new(0, 1), NumberSequenceKeypoint.new(0.5, 0.3), NumberSequenceKeypoint.new(1, 1) }) }),
+	})
+	local _ = reflection
+	new("Frame", {
+		Name = "Rim",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(1, 1),
+		BackgroundTransparency = 1,
+		Parent = lens,
+	}, {
+		new("UICorner", { CornerRadius = UDim.new(0.5, 0) }),
+		new("UIStroke", { Color = Color3.fromRGB(80, 170, 255), Thickness = 3, Transparency = 0.35 }),
+	})
+	new("Frame", {
+		Name = "InnerRing",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromScale(0.94, 0.94),
+		BackgroundTransparency = 1,
+		Parent = lens,
+	}, {
+		new("UICorner", { CornerRadius = UDim.new(0.5, 0) }),
+		new("UIStroke", { Color = Color3.new(0, 0, 0), Thickness = 2, Transparency = 0.55 }),
+	})
+	-- Punto central iluminado con halo
+	new("Frame", {
+		Name = "DotGlow",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.fromScale(0.5, 0.5),
+		Size = UDim2.fromOffset(14, 14),
+		BackgroundColor3 = Color3.fromRGB(255, 60, 60),
+		BackgroundTransparency = 0.7,
+		BorderSizePixel = 0,
+		ZIndex = 2,
+		Parent = lens,
+	}, { new("UICorner", { CornerRadius = UDim.new(1, 0) }) })
+
 	-- Retícula
 	local function line(size: UDim2, pos: UDim2)
 		new("Frame", { AnchorPoint = Vector2.new(0.5, 0.5), Size = size, Position = pos, BackgroundColor3 = Color3.new(0, 0, 0), BorderSizePixel = 0, Parent = lens })
@@ -475,10 +540,11 @@ local function update()
 	local sway = ClientState.Sway or Vector2.zero
 	local shk = ClientState.ShakeOffset or Vector3.zero
 	local px = (camera.ViewportSize.Y / 2) / math.tan(math.rad(camera.FieldOfView / 2))
-	local ox = math.tan(math.rad(sway.X)) * px + shk.X * 6
-	local oy = -math.tan(math.rad(sway.Y)) * px + shk.Y * 6
-	refs.Scope.Position = UDim2.new(0, ox, 0, oy)
-	refs.Crosshair.Position = UDim2.new(0.5, ox * 0.3, 0.5, oy * 0.3)
+	local ox = math.tan(math.rad(sway.X)) * px
+	local oy = -math.tan(math.rad(sway.Y)) * px
+	-- La retícula se mueve con el vaivén (exacto: es donde va la bala); el temblor solo al crosshair
+	refs.Scope.Position = UDim2.new(0, math.floor(ox + 0.5), 0, math.floor(oy + 0.5))
+	refs.Crosshair.Position = UDim2.new(0.5, shk.X * 4, 0.5, shk.Y * 4)
 	-- Línea de estado (diagnóstico): si algo falla, una captura de esto basta
 	if duel then
 		refs.Status.Text = string.format("estado: %s · armado: %s · arma: %s · ranura: %d · mira: %s · menú: %s · último tiro: %s", tostring(duel.State), if armed then "sí" else "NO", tostring(ClientState.WeaponId ~= "" and ClientState.WeaponId or player:GetAttribute("SD_Weapon") or "-"), ClientState.Slot, tostring(ClientState.Scoped), tostring(ClientState.MenuOpen), ClientState.LastShot ~= "" and ClientState.LastShot or "-")

@@ -29,7 +29,7 @@ local memoryStore: { [string]: any } = {}
 
 local function template()
 	return {
-		Version = 1,
+		Version = 2,
 		Coins = 1000, -- regalo de bienvenida: da para abrir cajas desde el principio
 		Candies = 200,
 		XP = 0,
@@ -53,7 +53,7 @@ local function template()
 		ProcessedReceipts = {}, -- ids de compras ya entregadas (idempotencia)
 		TradesCompleted = 0,
 		Equipped = { Weapon = "Intervention", Skin = "Default" },
-		Settings = { Sensitivity = 1, ScopeSensitivity = 0.55, ToggleScope = false },
+		Settings = { Sensitivity = 1, ScopeSensitivity = 1, ToggleScope = false },
 	}
 end
 
@@ -285,6 +285,11 @@ local function onPlayerAdded(player: Player)
 	local data = raw or template()
 	data.SessionLock = nil
 	reconcile(data, template())
+	-- Migración v2: la sensibilidad con mira ahora es relativa al zoom
+	if (data.Version or 1) < 2 then
+		data.Settings.ScopeSensitivity = 1
+		data.Version = 2
+	end
 	profiles[player] = data
 	setupLeaderstats(player, data)
 	DataService.Push(player)

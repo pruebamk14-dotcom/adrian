@@ -918,8 +918,22 @@ roblox.implementMethod("Workspace", "Raycast", function(_, origin, direction, pa
 		end
 		return false
 	end
-	for _, d in workspaceSvc:GetDescendants() do
-		if d:IsA("BasePart") and d.CanQuery and d ~= camera and not excluded(d) and d.Transparency < 1 then
+	-- Caché de piezas consultables (el mapa es estático; se refresca cada 0,5 s)
+	if os.clock() - (M._rayCacheAt or 0) > 0.5 then
+		local list = {}
+		for _, d in workspaceSvc:GetDescendants() do
+			if d:IsA("BasePart") and d.CanQuery and d.Transparency < 1 then
+				table.insert(list, d)
+			end
+		end
+		M._rayCache = list
+		M._rayCacheAt = os.clock()
+	end
+	-- Descartar rápido por distancia al segmento
+	local segLen = direction.Magnitude
+	local mid = origin + direction * 0.5
+	for _, d in M._rayCache do
+		if d.Parent and d ~= camera and (d.CFrame.Position - mid).Magnitude < segLen * 0.5 + d.Size.Magnitude and not excluded(d) then
 			local t = segmentHitsBox(origin, direction, d.CFrame, d.Size)
 			if t and t < bestT then
 				best, bestT = d, t
@@ -1639,8 +1653,21 @@ function M.RunScript(scriptInst, side: string)
 end
 
 -- Avance del mundo: física mínima (bots que se mueven) y vida
+local stepCount = 0
 function M.Step(dt: number)
 	pollAttributes()
+	-- Registrar humanoides clonados (bots) que no pasaron por BuildR15
+	stepCount += 1
+	if stepCount % 10 == 1 then
+		for _, m in workspaceSvc:GetChildren() do
+			if m:IsA("Model") then
+				local d = m:FindFirstChildOfClass("Humanoid")
+				if d and not humanoids[key(d)] then
+					humanoids[key(d)] = d
+				end
+			end
+		end
+	end
 	for id, hum in humanoids do
 		local char = hum.Parent
 		if not char or not char.Parent then
@@ -1651,7 +1678,8 @@ function M.Step(dt: number)
 		if root then
 			local target = moveTargets[key(hum)]
 			if target then
-				local delta = Vector3.new(target.X - root.Position.X, 0, target.Z - root.Position.Z)
+				local rp = root.CFrame.Position
+				local delta = Vector3.new(target.X - rp.X, 0, target.Z - rp.Z)
 				if delta.Magnitude < 0.5 then
 					moveTargets[key(hum)] = nil
 					getSignal(hum, "MoveToFinished"):Fire(true)
@@ -1700,6 +1728,9 @@ function M.Run(seconds: number)
 		M.Step(now - last)
 		last = now
 	end
+	-- El tiempo gastado dentro del último Step también cuenta (si no, con
+	-- fotogramas lentos la simulación avanza menos de lo pedido)
+	M.Step(os.clock() - last)
 end
 
 return M
