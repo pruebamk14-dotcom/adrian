@@ -182,4 +182,75 @@ function GunBuilder.BuildTool(weaponId: string, skinId: string): Tool
 	return tool
 end
 
+-- Cuchillo mariposa: hoja + dos mangos que giran alrededor del pivote
+-- ("Pivot"). El cliente anima los mangos (Handle1/Handle2) en reposo.
+function GunBuilder.BuildKnife(skinId: string): Model
+	local s = Skins.Get(skinId)
+	local model = Instance.new("Model")
+	model.Name = "Knife"
+	local pivot = part(model, "Pivot", Vector3.new(0.14, 0.14, 0.14), CFrame.new(0, 0, 0), "Metal", Enum.PartType.Ball)
+	-- Hoja
+	local blade = part(model, "Blade", Vector3.new(0.05, 0.28, 1.25), CFrame.new(0, 0, -0.72), "Accent")
+	blade.Material = Enum.Material.Metal
+	blade.Color = s.Accent
+	local tip = wedge(model, "BladeTip", Vector3.new(0.05, 0.28, 0.35), CFrame.new(0, 0, -1.52) * CFrame.Angles(0, math.rad(180), 0), "Accent")
+	tip.Material = Enum.Material.Metal
+	tip.Color = s.Accent
+	local edge = part(model, "Edge", Vector3.new(0.02, 0.06, 1.2), CFrame.new(0, -0.14, -0.72), "Glass")
+	edge.Color = Color3.fromRGB(230, 235, 245)
+	edge.Material = Enum.Material.Neon
+	edge.Transparency = 0
+	-- Mangos (cada uno con su propio pivote para la animación)
+	for i, side in { -1, 1 } do
+		local h = part(model, "Handle" .. i, Vector3.new(0.1, 0.16, 1.15), CFrame.new(side * 0.08, 0, 0.6), "Body")
+		h.Color = s.Color
+		h.Material = s.Material
+		h:SetAttribute("Side", side)
+		for k = 0, 3 do
+			local hole = part(model, "Hole" .. i .. k, Vector3.new(0.12, 0.07, 0.07), CFrame.new(side * 0.08, 0, 0.2 + k * 0.25), "Metal")
+			hole.Color = Color3.fromRGB(20, 20, 24)
+			hole:SetAttribute("HandleSide", side)
+		end
+	end
+	model.PrimaryPart = pivot
+	for _, p in model:GetChildren() do
+		if p:IsA("BasePart") and p ~= pivot then
+			local weld = Instance.new("WeldConstraint")
+			weld.Part0 = pivot
+			weld.Part1 = p
+			weld.Parent = p
+		end
+	end
+	local glow = s.Glow
+	if glow then
+		local light = Instance.new("PointLight")
+		light.Name = "SkinGlow"
+		light.Color = s.Color
+		light.Range = 5
+		light.Brightness = 1.2
+		light.Parent = pivot
+	end
+	model:SetAttribute("SkinId", skinId)
+	return model
+end
+
+function GunBuilder.BuildKnifeTool(skinId: string): Tool
+	local model = GunBuilder.BuildKnife(skinId)
+	local tool = Instance.new("Tool")
+	tool.Name = "Knife"
+	tool.RequiresHandle = true
+	tool.CanBeDropped = false
+	tool.ManualActivationOnly = true
+	tool.Grip = CFrame.new(0, -0.1, 0.45) * CFrame.Angles(math.rad(-90), 0, 0)
+	local pivot = model.PrimaryPart :: BasePart
+	for _, c in model:GetChildren() do
+		c.Parent = tool
+	end
+	pivot.Name = "Handle"
+	pivot.Size = Vector3.new(0.5, 0.5, 0.5)
+	pivot.Transparency = 1
+	model:Destroy()
+	return tool
+end
+
 return GunBuilder

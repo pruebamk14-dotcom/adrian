@@ -47,6 +47,9 @@ local function template()
 		WinStreak = 0,
 		BestStreak = 0,
 		Inventory = { Skins = { Default = true }, Weapons = {} },
+		DailyStreak = 0,
+		LastDailyClaim = 0,
+		JoinDays = 0,
 		ProcessedReceipts = {}, -- ids de compras ya entregadas (idempotencia)
 		TradesCompleted = 0,
 		Equipped = { Weapon = "Intervention", Skin = "Default" },
@@ -150,6 +153,11 @@ local function saveRaw(player: Player, data: any, release: boolean)
 	end)
 end
 
+-- ¿Puede reclamar la recompensa diaria?
+function DataService.DailyClaimable(data: any): boolean
+	return os.time() - (data.LastDailyClaim or 0) >= GameConfig.Daily.MinHours * 3600
+end
+
 -- VIP lo marca MonetizationService con un flag de sesión (no se guarda: se
 -- comprueba el pase cada vez que entras)
 local function player_isVIP(data: any): boolean
@@ -177,6 +185,9 @@ local function publicData(data: any)
 		Inventory = data.Inventory,
 		Equipped = data.Equipped,
 		VIP = player_isVIP(data),
+		DailyStreak = data.DailyStreak,
+		DailyClaimable = DataService.DailyClaimable(data),
+		Rank = nil,
 		Settings = data.Settings,
 	}
 end
@@ -298,6 +309,45 @@ function DataService.Start()
 	Net.Function("GetData").OnServerInvoke = function(player)
 		local d = DataService.WaitFor(player, 15)
 		return d and publicData(d)
+	end
+
+	Net.Function("ClaimDaily").OnServerInvoke = function(player)
+		local d = profiles[player]
+		if not d then
+			return { Ok = false, Error = "Datos no cargados" }
+		end
+		if not DataService.DailyClaimable(d) then
+			local left = GameConfig.Daily.MinHours * 3600 - (os.time() - d.LastDailyClaim)
+			return { Ok = false, Error = string.format("Vuelve en %dh %02dm", left // 3600, (left % 3600) // 60), Day = d.DailyStreak }
+		end
+		local now = os.time()
+		local keepStreak = now - d.LastDailyClaim <= GameConfig.Daily.MaxHours * 3600
+		local day = if keepStreak then (d.DailyStreak % 7) + 1 else 1
+		d.DailyStreak = day
+		d.LastDailyClaim = now
+		local reward = GameConfig.Daily.Rewards[day]
+		local result: { [string]: any } = { Ok = true, Day = day }
+		if reward == "Crate" then
+			local Skins = require(Shared.Config.Skins)
+			local skin = Skins.Roll(Random.new(), if GameConfig.HalloweenEvent then "Halloween" else "Standard")
+			local duplicate = d.Inventory.Skins[skin.Id] == true
+			if not duplicate then
+				d.Inventory.Skins[skin.Id] = true
+			end
+			d.Candies += GameConfig.Daily.CrateCandies
+			result.SkinId = skin.Id
+			result.Duplicate = duplicate
+			result.Candies = GameConfig.Daily.CrateCandies
+		else
+			local coins = reward :: number
+			if d._VIP then
+				coins *= GameConfig.Monetization.VIPMultiplier
+			end
+			d.Coins += coins
+			result.Coins = coins
+		end
+		DataService.Push(player)
+		return result
 	end
 
 	Net.Function("UpdateSettings").OnServerInvoke = function(player, settings)

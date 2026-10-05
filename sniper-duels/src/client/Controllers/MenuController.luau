@@ -18,6 +18,9 @@ local Make = require(script.Parent.Parent.UI.Make)
 local ShopUI = require(script.Parent.Parent.UI.ShopUI)
 local TradeUI = require(script.Parent.Parent.UI.TradeUI)
 local AdminUI = require(script.Parent.Parent.UI.AdminUI)
+local PauseMenu = require(script.Parent.Parent.UI.PauseMenu)
+local DailyUI = require(script.Parent.Parent.UI.DailyUI)
+local DebugOverlay = require(script.Parent.Parent.UI.DebugOverlay)
 local HUDController = require(script.Parent.HUDController)
 
 local T = Make.Theme
@@ -179,6 +182,12 @@ local function buildDock()
 		Parent = gui,
 	})
 	refs.Dock = dock
+
+	-- Recompensa diaria
+	Make.Button("🎁", T.Gold, { Size = UDim2.fromOffset(56, 56), TextSize = 24, LayoutOrder = 0, Parent = dock }, function()
+		MenuController.Close()
+		DailyUI.Open()
+	end)
 
 	-- Botón de admin (solo admins; el rango lo pone el servidor)
 	local adminBtn = Make.Button("🛡 ADMIN", Color3.fromRGB(40, 90, 170), { Size = UDim2.fromOffset(110, 56), LayoutOrder = 99, Visible = false, Parent = dock }, function()
@@ -400,6 +409,7 @@ local function setVisible(visible: boolean)
 		ShopUI.Close()
 		TradeUI.CloseAll()
 		AdminUI.Close()
+		DailyUI.Close()
 	end
 end
 
@@ -412,6 +422,9 @@ function MenuController.Start()
 	ShopUI.Build(gui)
 	TradeUI.Build(gui, HUDController.Toast)
 	AdminUI.Build(gui)
+	PauseMenu.Build(gui)
+	DailyUI.Build(gui, HUDController.Toast)
+	DebugOverlay.Build(gui)
 	buildLeaderboard()
 	buildStats()
 

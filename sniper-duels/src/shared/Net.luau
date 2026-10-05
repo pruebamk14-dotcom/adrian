@@ -6,6 +6,11 @@ local RunService = game:GetService("RunService")
 
 local EVENTS = {
 	"Fire", -- C->S: origin, direction, shotTime
+	"Melee", -- C->S: cuchillada
+	"SetSlot", -- C->S: 1 rifle / 2 cuchillo
+	"LeaveDuel", -- C->S: abandonar el duelo actual
+	"Armed", -- S->C: weaponId, mag, reloading (redundante con los atributos)
+	"ServerLog", -- S->C (admins): errores del servidor
 	"Reload", -- C->S
 	"ScopeState", -- C->S: bool (para velocidad de movimiento)
 	"ShotFx", -- S->C: shooterCharacter, origin, direction, weaponId, skinId
@@ -36,6 +41,7 @@ local FUNCTIONS = {
 	"BuyWeapon",
 	"Gift",
 	"AdminCommand",
+	"ClaimDaily",
 }
 
 local Net = {}

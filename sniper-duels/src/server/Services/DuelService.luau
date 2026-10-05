@@ -428,6 +428,16 @@ endDuel = function(duel: Duel, winner: Combatant, reason: string)
 	ArenaService.Release(duel.Arena)
 end
 
+-- Abandonar el duelo (menú): el rival gana por abandono
+function DuelService.Forfeit(player: Player)
+	local duel = duels[player]
+	if not duel or duel.Finished then
+		return
+	end
+	local other = opponentOf(duel, player)
+	task.spawn(endDuel, duel, other, "forfeit")
+end
+
 function DuelService.IsBusy(c: Combatant): boolean
 	return duels[c] ~= nil
 end
@@ -505,6 +515,8 @@ function DuelService.Start()
 		end
 		roundOver(duel, killer, "kill")
 	end)
+
+	Net.Event("LeaveDuel").OnServerEvent:Connect(DuelService.Forfeit)
 
 	Players.PlayerRemoving:Connect(function(player)
 		local duel = duels[player]

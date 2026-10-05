@@ -413,6 +413,123 @@ local function startAmbience()
 	end)
 end
 
+
+-- El Comandante en el cielo ------------------------------------------------------
+-- Cara gigante y espectral (gorra verde, barba gris, cejas espesas, ojos
+-- hundidos) que aparece entre las estrellas unos segundos cada pocos minutos,
+-- como en el cuadro. Solo visual.
+
+local skyFace: Model? = nil
+local skyFaceParts: { { Part: BasePart, Base: number } } = {}
+
+local function facePart(m: Model, name: string, size: Vector3, offset: CFrame, color: Color3, material: Enum.Material, transparency: number, sphere: boolean?): Part
+	local p = Instance.new("Part")
+	p.Name = name
+	p.Anchored = true
+	p.CanCollide = false
+	p.CanQuery = false
+	p.CanTouch = false
+	p.CastShadow = false
+	p.Size = size
+	p.Color = color
+	p.Material = material
+	p.Transparency = 1
+	if sphere then
+		local mesh = Instance.new("SpecialMesh")
+		mesh.MeshType = Enum.MeshType.Sphere
+		mesh.Parent = p
+	end
+	p:SetAttribute("Offset", offset)
+	p.Parent = m
+	table.insert(skyFaceParts, { Part = p, Base = transparency })
+	return p
+end
+
+local function buildSkyFace(): Model
+	local m = Instance.new("Model")
+	m.Name = "ElComandanteSky"
+	local S = 1 -- escala base (la cara mide ~60 studs)
+	local skin = Color3.fromRGB(215, 190, 170)
+	local shadow = Color3.fromRGB(120, 95, 90)
+	local grey = Color3.fromRGB(190, 190, 195)
+	local olive = Color3.fromRGB(70, 92, 55)
+	-- Cara (elipsoide) y mejillas hundidas
+	facePart(m, "Head", Vector3.new(40, 52, 36) * S, CFrame.new(0, 0, 0), skin, Enum.Material.SmoothPlastic, 0.35, true)
+	facePart(m, "CheekL", Vector3.new(14, 12, 10) * S, CFrame.new(-11, -8, -14), shadow, Enum.Material.SmoothPlastic, 0.6, true)
+	facePart(m, "CheekR", Vector3.new(14, 12, 10) * S, CFrame.new(11, -8, -14), shadow, Enum.Material.SmoothPlastic, 0.6, true)
+	-- Gorra verde con visera
+	facePart(m, "Cap", Vector3.new(44, 16, 40) * S, CFrame.new(0, 22, 1), olive, Enum.Material.Fabric, 0.25, true)
+	facePart(m, "CapBand", Vector3.new(43, 5, 39) * S, CFrame.new(0, 16, 1), Color3.fromRGB(55, 72, 42), Enum.Material.Fabric, 0.25, true)
+	facePart(m, "Visor", Vector3.new(30, 2, 14) * S, CFrame.new(0, 15, -20) * CFrame.Angles(math.rad(-12), 0, 0), olive, Enum.Material.Fabric, 0.25)
+	-- Cejas gruesas y ojos hundidos
+	for _, x in { -8, 8 } do
+		facePart(m, "Brow", Vector3.new(13, 3.5, 4) * S, CFrame.new(x, 9, -17) * CFrame.Angles(0, 0, math.rad(if x < 0 then 8 else -8)), Color3.fromRGB(80, 80, 85), Enum.Material.Fabric, 0.3)
+		facePart(m, "Socket", Vector3.new(11, 7, 6) * S, CFrame.new(x, 4, -16.5), Color3.fromRGB(60, 45, 50), Enum.Material.SmoothPlastic, 0.4, true)
+		facePart(m, "Eye", Vector3.new(4, 4, 3) * S, CFrame.new(x, 4, -19), Color3.fromRGB(25, 20, 20), Enum.Material.SmoothPlastic, 0.1, true)
+		facePart(m, "Glint", Vector3.new(1.2, 1.2, 1.2) * S, CFrame.new(x - 1, 5, -20.3), Color3.fromRGB(255, 255, 230), Enum.Material.Neon, 0.1, true)
+	end
+	-- Nariz y barba (varias esferas grises)
+	facePart(m, "Nose", Vector3.new(8, 13, 9) * S, CFrame.new(0, -2, -18) * CFrame.Angles(math.rad(10), 0, 0), skin, Enum.Material.SmoothPlastic, 0.35, true)
+	local beard = { { 0, -16, -14, 26, 20, 16 }, { -10, -12, -12, 16, 14, 12 }, { 10, -12, -12, 16, 14, 12 }, { 0, -26, -10, 20, 16, 12 }, { -6, -30, -8, 12, 12, 10 }, { 6, -30, -8, 12, 12, 10 } }
+	for i, b in beard do
+		facePart(m, "Beard" .. i, Vector3.new(b[4], b[5], b[6]) * S, CFrame.new(b[1], b[2], b[3]), grey, Enum.Material.Fabric, 0.3, true)
+	end
+	facePart(m, "Mustache", Vector3.new(16, 4, 5) * S, CFrame.new(0, -9, -17), grey, Enum.Material.Fabric, 0.3, true)
+	-- Halo espectral
+	local halo = facePart(m, "Halo", Vector3.new(70, 80, 10) * S, CFrame.new(0, 0, 12), Color3.fromRGB(200, 220, 255), Enum.Material.Neon, 0.92, true)
+	local light = Instance.new("PointLight")
+	light.Color = Color3.fromRGB(190, 210, 255)
+	light.Range = 60
+	light.Brightness = 0.6
+	light.Parent = halo
+	m.Parent = folder
+	return m
+end
+
+local skyFaceVisible = 0 -- 0..1
+local skyFaceTarget = 0
+local skyAnchor = Vector3.zero
+
+local function updateSkyFace(dt: number)
+	local m = skyFace
+	if not m then
+		return
+	end
+	skyFaceVisible += (skyFaceTarget - skyFaceVisible) * math.clamp(dt * 0.6, 0, 1)
+	if skyFaceVisible < 0.01 and skyFaceTarget == 0 then
+		for _, e in skyFaceParts do
+			e.Part.Transparency = 1
+		end
+		return
+	end
+	local camPos = camera.CFrame.Position
+	-- Aparece lejos, alto, y mira al jugador
+	if skyFaceTarget > 0 and skyAnchor == Vector3.zero then
+		local flat = Vector3.new(camera.CFrame.LookVector.X, 0, camera.CFrame.LookVector.Z)
+		flat = if flat.Magnitude > 0 then flat.Unit else Vector3.new(0, 0, -1)
+		skyAnchor = camPos + flat * 260 + Vector3.new(0, 130, 0)
+	end
+	local t = os.clock()
+	local pos = skyAnchor + Vector3.new(math.sin(t * 0.3) * 4, math.sin(t * 0.5) * 3, 0)
+	local cf = CFrame.lookAt(pos, Vector3.new(camPos.X, camPos.Y, camPos.Z)) * CFrame.Angles(0, math.rad(180), 0)
+	for _, e in skyFaceParts do
+		local offset = e.Part:GetAttribute("Offset") :: CFrame
+		e.Part.CFrame = cf * offset
+		local flicker = 0.9 + math.noise(t * 2, (e.Part.Position.X % 7)) * 0.2
+		e.Part.Transparency = 1 - (1 - e.Base) * skyFaceVisible * flicker
+	end
+end
+
+local function showSkyFace(seconds: number)
+	skyAnchor = Vector3.zero
+	skyFaceTarget = 1
+	EffectsController.PlaySound("GhostWhoosh", 0.7)
+	task.delay(seconds, function()
+		skyFaceTarget = 0
+	end)
+end
+AmbientController.ShowCommander = showSkyFace
+
 function AmbientController.Start()
 	for _, l in CollectionService:GetTagged("Flicker") do
 		addFlicker(l)
@@ -430,6 +547,16 @@ function AmbientController.Start()
 			table.insert(ghosts, makeGhost(i == 1))
 		end
 		startAmbience()
+		skyFace = buildSkyFace()
+		task.spawn(function()
+			task.wait(25)
+			while true do
+				if not ClientState.Scoped then
+					showSkyFace(18)
+				end
+				task.wait(math.random(120, 200))
+			end
+		end)
 		-- Sustos de vez en cuando, nunca durante un duelo
 		task.spawn(function()
 			local playerGui = game:GetService("Players").LocalPlayer:WaitForChild("PlayerGui")
@@ -467,6 +594,7 @@ function AmbientController.Start()
 		if halloween then
 			updateBats(dt)
 			updateGhosts(dt)
+			updateSkyFace(dt)
 			if embers then
 				local cp = camera.CFrame.Position
 				embers.CFrame = CFrame.new(cp.X, cp.Y - 4, cp.Z)

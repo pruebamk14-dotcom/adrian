@@ -28,6 +28,10 @@ type Combatant = any
 type State = {
 	WeaponId: string,
 	SkinId: string,
+	Slot: number, -- 1 rifle, 2 cuchillo
+	LastMelee: number,
+	RifleTool: Tool?,
+	KnifeTool: Tool?,
 	Mag: number,
 	Reloading: boolean,
 	LastFire: number,
@@ -85,6 +89,9 @@ local function pushAmmo(player: Combatant)
 		player:SetAttribute("SD_Weapon", s.WeaponId)
 		player:SetAttribute("SD_Mag", s.Mag)
 		player:SetAttribute("SD_Reloading", s.Reloading)
+		player:SetAttribute("SD_Slot", s.Slot)
+		-- Vía redundante: evento explícito por si los atributos tardan
+		Net.Event("Armed"):FireClient(player, s.WeaponId, s.Mag, s.Reloading, s.Slot)
 	end
 end
 
@@ -121,19 +128,61 @@ local function attachGun(player: Combatant)
 			inPack:Destroy()
 		end
 	end
+	local old2 = character:FindFirstChild("Knife")
+	if old2 then
+		old2:Destroy()
+	end
 	local tool = GunBuilder.BuildTool(s.WeaponId, s.SkinId)
+	local knife = GunBuilder.BuildKnifeTool(s.SkinId)
+	s.RifleTool = tool
+	s.KnifeTool = knife
+	s.Slot = 1
 	tool.Parent = character -- al ponerlo en el personaje se equipa en la mano
-	-- Si el jugador intenta guardarlo (tecla 1 / retroceso), se vuelve a equipar
-	tool.AncestryChanged:Connect(function(_, parent)
-		if parent and parent:IsA("Backpack") and states[player] == s and character.Parent then
-			task.defer(function()
-				if tool.Parent and tool.Parent:IsA("Backpack") then
-					tool.Parent = character
-				end
-			end)
-		end
-	end)
+	if isPlayer(player) then
+		local backpack = player:FindFirstChildOfClass("Backpack")
+		knife.Parent = backpack or character
+	end
+	-- Si el jugador intenta guardar el arma activa (retroceso), se vuelve a equipar
+	local function keepEquipped(t: Tool, slot: number)
+		t.AncestryChanged:Connect(function(_, parent)
+			if parent and parent:IsA("Backpack") and states[player] == s and s.Slot == slot and character.Parent then
+				task.defer(function()
+					if t.Parent and t.Parent:IsA("Backpack") and s.Slot == slot then
+						t.Parent = character
+					end
+				end)
+			end
+		end)
+	end
+	keepEquipped(tool, 1)
+	keepEquipped(knife, 2)
 	poseArms(character, true)
+end
+
+-- Cambiar de ranura: 1 rifle, 2 cuchillo
+function CombatService.SetSlot(player: Combatant, slot: number)
+	local s = states[player]
+	local character = player.Character
+	if not s or not character or not s.RifleTool or not s.KnifeTool then
+		return
+	end
+	slot = if slot == 2 then 2 else 1
+	if s.Slot == slot then
+		return
+	end
+	s.Slot = slot
+	local backpack = if isPlayer(player) then player:FindFirstChildOfClass("Backpack") else nil
+	local active = if slot == 1 then s.RifleTool else s.KnifeTool
+	local inactive = if slot == 1 then s.KnifeTool else s.RifleTool
+	if inactive and inactive.Parent == character then
+		inactive.Parent = backpack
+	end
+	if active and active.Parent ~= character then
+		active.Parent = character
+	end
+	character:SetAttribute("Scoped", false)
+	character:SetAttribute("Slot", slot)
+	pushAmmo(player)
 end
 
 function CombatService.Arm(player: Combatant, weaponOverride: string?, skinOverride: string?)
@@ -145,6 +194,10 @@ function CombatService.Arm(player: Combatant, weaponOverride: string?, skinOverr
 	states[player] = {
 		WeaponId = w.Id,
 		SkinId = skinId,
+		Slot = 1,
+		LastMelee = 0,
+		RifleTool = nil,
+		KnifeTool = nil,
 		Mag = w.MagSize,
 		Reloading = false,
 		LastFire = 0,
@@ -157,13 +210,23 @@ function CombatService.Arm(player: Combatant, weaponOverride: string?, skinOverr
 end
 
 function CombatService.Disarm(player: Combatant)
+	local s = states[player]
 	states[player] = nil
 	HitboxHistory.Untrack(player)
+	if s then
+		for _, t in { s.RifleTool, s.KnifeTool } do
+			if t then
+				t:Destroy()
+			end
+		end
+	end
 	local character = player.Character
 	if character then
-		local gun = character:FindFirstChild("Rifle")
-		if gun then
-			gun:Destroy()
+		for _, name in { "Rifle", "Knife" } do
+			local t = character:FindFirstChild(name)
+			if t then
+				t:Destroy()
+			end
 		end
 		character:SetAttribute("Scoped", false)
 		poseArms(character, false)
@@ -172,6 +235,8 @@ function CombatService.Disarm(player: Combatant)
 		player:SetAttribute("SD_Weapon", "")
 		player:SetAttribute("SD_Mag", 0)
 		player:SetAttribute("SD_Reloading", false)
+		player:SetAttribute("SD_Slot", 1)
+		Net.Event("Armed"):FireClient(player, "", 0, false, 1)
 	end
 end
 
@@ -193,6 +258,7 @@ function CombatService.ResetForRound(player: Combatant)
 	s.Reloading = false
 	s.ReloadToken += 1
 	s.LastFire = 0
+	s.Slot = 1
 	attachGun(player)
 	HitboxHistory.Clear(player)
 	pushAmmo(player)
@@ -371,7 +437,78 @@ local function fireShot(player: Combatant, origin: any, direction: any, shotTime
 end
 
 local function onFire(player: Player, origin: any, direction: any, shotTime: any)
+	local s = states[player]
+	if s and s.Slot ~= 1 then
+		return
+	end
 	fireShot(player, origin, direction, shotTime)
+end
+
+-- Cuchillada: el servidor comprueba distancia y orientación contra las
+-- hitboxes del rival (rebobinadas igual que las balas)
+local function onMelee(player: Player)
+	local s = states[player]
+	if not s or not s.CanFire or s.Slot ~= 2 then
+		return
+	end
+	local m = Weapons.Melee
+	local clock = os.clock()
+	if clock - s.LastMelee < m.Cooldown * 0.9 then
+		return
+	end
+	s.LastMelee = clock
+	local character = player.Character
+	local head = character and character:FindFirstChild("Head") :: BasePart?
+	local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+	if not head or not humanoid or humanoid.Health <= 0 then
+		return
+	end
+	local look = head.CFrame.LookVector
+	local now = workspace:GetServerTimeNow()
+	for _, other in Players:GetPlayers() do
+		if other ~= player then
+			Net.Event("ShotFx"):FireClient(other, character, head.Position, look, "Knife", s.SkinId)
+		end
+	end
+	local bestDist, bestVictim, bestZone = math.huge, nil :: Combatant?, ""
+	for _, target in CombatService.TargetResolver(player) do
+		local boxes = HitboxHistory.Sample(target, now - GameConfig.ViewInterpolationDelay)
+		if boxes then
+			for _, box in boxes do
+				local to = box.CFrame.Position - head.Position
+				local d = to.Magnitude
+				if d <= m.Range + math.max(box.Size.X, box.Size.Z) * 0.5 and (d < 1.5 or to.Unit:Dot(look) > 0.35) and d < bestDist then
+					bestDist, bestVictim, bestZone = d, target, box.Zone
+				end
+			end
+		end
+	end
+	if bestVictim then
+		local vh = bestVictim.Character and bestVictim.Character:FindFirstChildOfClass("Humanoid")
+		if vh and vh.Health > 0 then
+			local killed = vh.Health - m.Damage <= 0
+			vh.Health = math.max(0, vh.Health - m.Damage)
+			local data = DataService.Get(player)
+			if data then
+				data.ShotsFired += 1
+				data.ShotsHit += 1
+			end
+			Net.Event("HitConfirm"):FireClient(player, bestZone, m.Damage, killed, math.floor(bestDist))
+			if isPlayer(bestVictim) then
+				Net.Event("Damaged"):FireClient(bestVictim, head.Position, m.Damage, vh.Health)
+			end
+			if killed then
+				if data then
+					data.Kills += 1
+				end
+				local vdata = if isPlayer(bestVictim) then DataService.Get(bestVictim) else nil
+				if vdata then
+					vdata.Deaths += 1
+				end
+				CombatService.Killed:Fire(player, bestVictim, { Headshot = false, Distance = math.floor(bestDist), WeaponId = "Knife" })
+			end
+		end
+	end
 end
 
 -- Disparo de un bot: mismas reglas (munición, cadencia, origen) que un jugador
@@ -411,6 +548,12 @@ end
 function CombatService.Start()
 	Net.Event("Fire").OnServerEvent:Connect(onFire)
 	Net.Event("Reload").OnServerEvent:Connect(onReload)
+	Net.Event("Melee").OnServerEvent:Connect(onMelee)
+	Net.Event("SetSlot").OnServerEvent:Connect(function(player, slot)
+		if type(slot) == "number" then
+			CombatService.SetSlot(player, slot)
+		end
+	end)
 	Net.Event("ScopeState").OnServerEvent:Connect(function(player, scoped)
 		local character = player.Character
 		if character and states[player] then

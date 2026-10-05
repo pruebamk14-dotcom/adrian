@@ -13,6 +13,9 @@ local ClientState = {
 	Reloading = false,
 	InQueue = false,
 	Scoped = false,
+	Slot = 1, -- 1 rifle, 2 cuchillo
+	Crouched = false,
+	MenuOpen = false, -- menú de pausa abierto: bloquea disparo y movimiento
 	ScopeProgress = 0,
 	Breath = 1, -- 0..1, aguantar respiración
 

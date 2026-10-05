@@ -169,6 +169,21 @@ local function buildBottom(parent: Instance)
 	refs.WeaponName = Make.Label("", { Position = UDim2.fromOffset(0, 44), Size = UDim2.new(1, 0, 0, 20), TextXAlignment = Enum.TextXAlignment.Right, TextColor3 = T.SubText, TextSize = 16, Parent = ammo })
 	refs.Ammo = ammo
 
+	-- Barra de ranuras (1 rifle / 2 cuchillo) como en Sniper Duels
+	local slots = new("Frame", { Name = "Slots", AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -28), Size = UDim2.fromOffset(200, 74), BackgroundTransparency = 1, Visible = false, Parent = parent }, {
+		new("UIListLayout", { FillDirection = Enum.FillDirection.Horizontal, Padding = UDim.new(0, 10), HorizontalAlignment = Enum.HorizontalAlignment.Center, SortOrder = Enum.SortOrder.LayoutOrder }),
+	})
+	refs.SlotFrames = {}
+	for i, icon in { "🔫", "🔪" } do
+		local f = new("Frame", { Size = UDim2.fromOffset(84, 74), BackgroundColor3 = T.Panel, BackgroundTransparency = 0.25, LayoutOrder = i, Parent = slots }, { Make.Corner(10), Make.Stroke(T.Stroke, 2) })
+		Make.Label(tostring(i), { Position = UDim2.fromOffset(6, 4), Size = UDim2.fromOffset(20, 16), TextXAlignment = Enum.TextXAlignment.Left, TextSize = 13, TextColor3 = T.SubText, Parent = f })
+		Make.Label(icon, { Position = UDim2.fromOffset(0, 10), Size = UDim2.new(1, 0, 0, 40), TextSize = 30, Parent = f })
+		local sub = Make.Label("", { Position = UDim2.fromOffset(0, 50), Size = UDim2.new(1, 0, 0, 18), TextSize = 13, Font = T.FontBlack, Parent = f })
+		refs.SlotFrames[i] = { Frame = f, Sub = sub }
+	end
+	refs.Slots = slots
+	refs.Hint = Make.Label("C agacharse · Shift+C deslizarse · Q cuchillo · M menú", { AnchorPoint = Vector2.new(0.5, 1), Position = UDim2.new(0.5, 0, 1, -8), Size = UDim2.fromOffset(600, 16), TextSize = 12, TextColor3 = T.SubText, Visible = false, Parent = parent })
+
 	local hp = new("Frame", { Name = "Health", AnchorPoint = Vector2.new(0, 1), Position = UDim2.new(0, 30, 1, -36), Size = UDim2.fromOffset(260, 14), BackgroundColor3 = Color3.fromRGB(30, 30, 30), BackgroundTransparency = 0.2, Visible = false, Parent = parent }, { Make.Corner(7) })
 	refs.HealthFill = new("Frame", { Size = UDim2.fromScale(1, 1), BackgroundColor3 = T.Accent, BorderSizePixel = 0, Parent = hp }, { Make.Corner(7) })
 	refs.HealthText = Make.Label("100", { Position = UDim2.fromOffset(0, -24), Size = UDim2.fromOffset(100, 22), TextXAlignment = Enum.TextXAlignment.Left, Font = T.FontBlack, TextSize = 20, Parent = hp })
@@ -450,10 +465,20 @@ local function update()
 	refs.Ammo.Visible = armed
 	refs.Health.Visible = armed
 	refs.Scope.Visible = armed and ClientState.Scoped
-	refs.Crosshair.Visible = armed and not ClientState.Scoped and ClientState.ScopeProgress < 0.5
+	refs.Crosshair.Visible = armed and not ClientState.Scoped and ClientState.ScopeProgress < 0.5 and not ClientState.MenuOpen
 
+	refs.Slots.Visible = armed
+	refs.Hint.Visible = armed
 	if armed then
 		local w = Weapons.Get(ClientState.WeaponId)
+		for i, sf in refs.SlotFrames do
+			local active = ClientState.Slot == i
+			local stroke = sf.Frame:FindFirstChildOfClass("UIStroke") :: UIStroke
+			stroke.Color = if active then T.Accent else T.Stroke
+			sf.Frame.BackgroundTransparency = if active then 0.05 else 0.4
+		end
+		refs.SlotFrames[1].Sub.Text = if ClientState.Reloading then "..." else string.format("%d / %d", ClientState.Mag, w.MagSize)
+		refs.SlotFrames[2].Sub.Text = "CUCHILLO"
 		refs.AmmoText.Text = if ClientState.Reloading then "RECARGANDO" else string.format("%d / %d", ClientState.Mag, w.MagSize)
 		refs.AmmoText.TextColor3 = if ClientState.Mag == 0 and not ClientState.Reloading then T.Danger else T.Text
 		refs.WeaponName.Text = w.DisplayName
@@ -506,6 +531,13 @@ function HUDController.Start()
 	Net.Event("Damaged").OnClientEvent:Connect(onDamaged)
 	Net.Event("KillFeed").OnClientEvent:Connect(addKillFeed)
 	Net.Event("Announce").OnClientEvent:Connect(function(from: string, msg: string)
+		if msg == "__SKYFACE__" then
+			local Ambient = require(script.Parent.AmbientController)
+			if Ambient.ShowCommander then
+				Ambient.ShowCommander(20)
+			end
+			return
+		end
 		HUDController.Banner("📢 " .. msg, "Anuncio de " .. from, T.Accent, 5)
 	end)
 	Net.Event("Notify").OnClientEvent:Connect(function(text: string, color: Color3?)

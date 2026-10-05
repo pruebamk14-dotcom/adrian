@@ -54,6 +54,8 @@ local HALLOWEEN_THEMES: { Theme } = {
 	{ Name = "Granja de Calabazas", Ground = Enum.Material.LeafyGrass, Patch = Enum.Material.Ground, Hill = Enum.Material.Grass, Cover = Color3.fromRGB(90, 62, 42), CoverMat = Enum.Material.WoodPlanks, Accent = Color3.fromRGB(255, 150, 30), Style = "farm" },
 	{ Name = "Mansión Embrujada", Ground = Enum.Material.Cobblestone, Patch = Enum.Material.Slate, Hill = Enum.Material.Rock, Cover = Color3.fromRGB(95, 80, 78), CoverMat = Enum.Material.Brick, Accent = Color3.fromRGB(170, 70, 255), Style = "ruins" },
 	{ Name = "Bosque Maldito", Ground = Enum.Material.Mud, Patch = Enum.Material.LeafyGrass, Hill = Enum.Material.Rock, Cover = Color3.fromRGB(80, 78, 84), CoverMat = Enum.Material.Rock, Accent = Color3.fromRGB(90, 255, 120), Style = "forest" },
+	{ Name = "Pueblo Abandonado", Ground = Enum.Material.Ground, Patch = Enum.Material.Cobblestone, Hill = Enum.Material.Rock, Cover = Color3.fromRGB(96, 70, 52), CoverMat = Enum.Material.WoodPlanks, Accent = Color3.fromRGB(255, 190, 60), Style = "village" },
+	{ Name = "Pantano Maldito", Ground = Enum.Material.Mud, Patch = Enum.Material.Grass, Hill = Enum.Material.LeafyGrass, Cover = Color3.fromRGB(60, 70, 50), CoverMat = Enum.Material.Rock, Accent = Color3.fromRGB(120, 255, 90), Style = "swamp" },
 }
 
 local NORMAL_THEMES: { Theme } = {
@@ -250,6 +252,64 @@ local function buildArena(index: number, origin: Vector3): Arena
 			pair(randomSpot(-L / 2 + 50, -20), function(parent, cf)
 				Props.Pumpkin(parent, cf, 2.6, true)
 			end)
+		end
+	elseif style == "village" then
+		-- Casas en ruinas de madera y piedra, vallas, farolas y calabazas en los porches
+		for _ = 1, 6 do
+			pair(randomSpot(-L / 2 + 50, -16), function(parent, cf, r)
+				local wall = Props.RuinWall(parent, cf, r:NextNumber(10, 18), r:NextNumber(7, 12), r)
+				for _, c in wall:GetChildren() do
+					if c:IsA("BasePart") then
+						c.Material = if r:NextNumber() < 0.5 then Enum.Material.WoodPlanks else Enum.Material.Brick
+						c.Color = if c.Material == Enum.Material.WoodPlanks then Color3.fromRGB(90, 64, 44) else Color3.fromRGB(110, 95, 85)
+					end
+				end
+				Props.Pumpkin(parent, cf * CFrame.new(r:NextNumber(-5, 5), 0, 3), 2.2, true)
+			end)
+		end
+		for _ = 1, 3 do
+			pair(randomSpot(-L / 2 + 60, -30), function(parent, cf)
+				Props.Fence(parent, cf.Position, (cf * CFrame.new(18, 0, 0)).Position)
+			end)
+		end
+		for _ = 1, 3 do
+			pair(randomSpot(-L / 2 + 50, -20), function(parent, cf)
+				Props.Lantern(parent, cf, Color3.fromRGB(255, 180, 70))
+			end)
+		end
+		pair(randomSpot(-L / 2 + 70, -50), function(parent, cf)
+			Props.Scarecrow(parent, cf)
+		end)
+	elseif style == "swamp" then
+		-- Agua turbia, troncos, rocas cubiertas de musgo y mucha niebla
+		for _ = 1, 8 do
+			pair(randomSpot(-L / 2 + 45, -12), function(parent, cf, r)
+				Props.DeadTree(parent, cf, r:NextNumber(16, 30), r)
+			end)
+		end
+		for _ = 1, 7 do
+			local size = Vector3.new(rng:NextNumber(5, 13), rng:NextNumber(3, 8), rng:NextNumber(5, 11))
+			pair(randomSpot(-L / 2 + 50, -16), function(parent, cf)
+				Props.Rock(parent, cf, size, Color3.fromRGB(70, 85, 60))
+			end)
+		end
+		for _ = 1, 4 do
+			pair(randomSpot(-L / 2 + 50, -20), function(parent, cf, r)
+				local log = block(parent, "Log", Vector3.new(r:NextNumber(8, 14), 2.4, 2.4), cf * CFrame.new(0, 1.2, 0) * CFrame.Angles(0, 0, 0), Color3.fromRGB(70, 50, 36), Enum.Material.Wood)
+				log.Shape = Enum.PartType.Cylinder
+			end)
+		end
+		for _ = 1, 3 do
+			pair(randomSpot(-L / 2 + 60, -30), function(parent, cf)
+				Props.Cauldron(parent, cf)
+			end)
+		end
+		for _ = 1, 6 do
+			local m = block(cover, "SwampMist", Vector3.new(1, 1, 1), base * CFrame.new(rng:NextNumber(-W / 2, W / 2), 0.5, rng:NextNumber(-L / 2, L / 2)), Color3.new(), Enum.Material.SmoothPlastic)
+			m.Transparency = 1
+			m.CanCollide = false
+			m.CanQuery = false
+			Props.Mist(m, Color3.fromRGB(150, 200, 150), 3)
 		end
 	else -- rocks
 		for _ = 1, 10 do

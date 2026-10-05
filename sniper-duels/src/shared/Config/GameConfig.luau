@@ -53,7 +53,7 @@ local GameConfig = {
 	BallisticStep = 1 / 120,
 
 	-- Arenas
-	ArenaCount = 8,
+	ArenaCount = 12, -- 2 por tema
 	ArenaSpacing = 600,
 	ArenaOrigin = Vector3.new(0, 0, 2000),
 
@@ -108,6 +108,20 @@ local GameConfig = {
 	Admins = {} :: { [number]: string },
 	StudioEveryoneAdmin = true,
 
+	-- Recompensa diaria (racha de 7 días). "Crate" = caja + caramelos
+	Daily = {
+		Rewards = { 50, 50, 100, 50, 50, 50, "Crate" },
+		CrateCandies = 200,
+		MinHours = 20, -- horas entre reclamaciones
+		MaxHours = 48, -- más de esto rompe la racha
+	},
+
+	-- Agacharse / deslizarse
+	CrouchSpeedMultiplier = 0.5,
+	CrouchHipDrop = 1.3,
+	SlideSpeed = 34,
+	SlideDuration = 0.75,
+
 	-- Intercambios
 	TradeConfirmTime = 4, -- s de cuenta atrás tras aceptar ambos (anti-estafa)
 	TradeMaxItems = 8,
@@ -128,6 +142,9 @@ local GameConfig = {
 		Ambience = "rbxassetid://9112775175", -- Eerie Ambience 1 (SFX)
 		GhostWhoosh = "rbxassetid://9120732173",
 		Jumpscare = "rbxassetid://9125712561",
+		Knife = "rbxassetid://9113081793", -- whoosh
+		Slide = "",
+		Daily = "rbxasset://sounds/electronicpingshort.wav",
 	},
 }
 

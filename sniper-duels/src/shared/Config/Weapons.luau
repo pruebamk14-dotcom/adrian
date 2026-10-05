@@ -225,6 +225,16 @@ Weapons.Obsidian = {
 	Tagline = "SOLO PARA LEYENDAS",
 }
 
+-- Cuchillo (ranura 2): una cuchillada a corta distancia elimina
+local Melee = {
+	Id = "Knife",
+	DisplayName = "Cuchillo mariposa",
+	Range = 8,
+	Cooldown = 0.55,
+	Damage = 100,
+	WalkMultiplier = 1.1, -- se corre más con el cuchillo
+}
+
 local Order = { "Intervention", "Viper", "Tempest", "Leviathan", "Valkyrie", "Reaper", "Obsidian" }
 
 -- ¿Se obtiene por nivel (gratis) o hay que comprarla?
@@ -237,6 +247,7 @@ return {
 	Order = Order,
 	Default = "Intervention",
 	IsShopWeapon = isShopWeapon,
+	Melee = Melee,
 	-- Un jugador tiene el arma si la desbloqueó por nivel o la tiene en el inventario
 	Owns = function(data: any, id: string): boolean
 		local w = Weapons[id]

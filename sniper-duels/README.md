@@ -19,6 +19,17 @@ Todo está escrito en **Luau** y se sincroniza con **Rojo**. No necesita assets 
 | Mapas | Fijos | Arenas **simétricas** (justas para ambos lados) con 4 temas, entre ellos *Lost Hill* |
 | Persistencia | — | DataStore con session-lock, autoguardado, reintentos y ranking global |
 
+## Novedades de la última versión
+
+- **Cuchillo mariposa** en la ranura 2 (tecla 2 o Q): una cuchillada a corta distancia elimina; en reposo hace el giro de mariposa. Se corre más rápido con él.
+- **Agacharse y deslizarse** (C o Ctrl; corriendo con Shift + C te deslizas como en Call of Duty). Agachado dispersas menos.
+- **Menú con M** (y botón ☰): continuar, sensibilidad, mira por pulsación o alternar, abandonar el duelo.
+- **Recompensa diaria** de 7 días (día 7: caja + caramelos). Se abre sola al entrar cuando toca.
+- **El Comandante** aparece como una cara gigante y fantasmal en el cielo cada pocos minutos (`:comandante` lo invoca).
+- Dos mapas más: **Pueblo Abandonado** y **Pantano Maldito** (12 arenas, 2 por tema).
+- Atardecer un punto más oscuro, sin perder visibilidad a distancia.
+- Armado blindado por tres vías y **consola de errores F8**.
+
 ## Novedades de la edición Halloween
 
 - **Modo solo contra bot con IA** (botón *VS BOT*): Práctica, Fácil, Normal, Difícil y Pesadilla. El bot es un francotirador con cabeza de calabaza que usa exactamente las mismas armas y reglas que un jugador: busca cobertura, te detecta con línea de visión real, adelanta tus movimientos, compensa la caída de la bala y se le ve el destello de la mira.
@@ -29,6 +40,21 @@ Todo está escrito en **Luau** y se sincroniza con **Rojo**. No necesita assets 
 - **Tienda premium**: modelos 3D giratorios, barras de estadísticas, ofertas destacadas, ruleta de cajas, packs de monedas y VIP.
 - **Intercambios y regalos** de skins y armas de tienda entre jugadores.
 - **Monetización**: pase VIP (x2 monedas y caramelos) y productos de Robux (packs de monedas, pack de caramelos y armas exclusivas).
+
+## Si algo falla: consola en pantalla (F8)
+
+El juego captura sus propios errores. Si aparece un aviso rojo **"⚠ N error(es) · F8"** arriba a la derecha, pulsa **F8**: se abre una consola con el error exacto (los admins ven también los del servidor). Haz una captura y envíala: con eso se arregla a la primera.
+
+## Probar sin Roblox Studio: simulador
+
+`tools/sim/` contiene un simulador de Roblox sobre [Lune](https://github.com/lune-org/lune) que ejecuta el servidor y el cliente reales y juega un duelo completo (armado, mira, disparo con balística, cuchillo, recarga, menú, recompensa diaria, abandono, intercambio, regalo y duelo en pads), comprobando más de 80 puntos:
+
+```bash
+rojo build -o build/sim.rbxl
+lune run tools/sim/run.luau       # añade -v para ver los print() del juego
+```
+
+Lune no es Roblox: valida nombres de propiedades y la lógica, pero no la física ni el renderizado.
 
 ## Administración (🛡 ADMIN)
 
@@ -142,7 +168,7 @@ Para generar un archivo de lugar: `rojo build -o SniperDuelsElite.rbxl`.
 
 ## Controles
 
-> El duelo es en **primera persona**: **clic derecho** apunta con la mira, **clic izquierdo** dispara. En el lobby la cámara vuelve a tercera persona.
+> El duelo es en **primera persona**: **clic derecho** apunta con la mira, **clic izquierdo** dispara. En el lobby la cámara vuelve a tercera persona. Roblox reserva la tecla **Escape** para su propio menú, por eso el del juego está en **M**.
 
 
 | Acción | PC | Mando | Móvil |
@@ -152,6 +178,10 @@ Para generar un archivo de lugar: `rojo build -o SniperDuelsElite.rbxl`.
 | Zoom | Z / rueda | Y | Botón ZOOM |
 | Recargar | R | X | Botón R |
 | Respirar / correr | Shift | L3 | — |
+| Agacharse / deslizarse (corriendo) | C o Ctrl | B | Botón AGACHAR |
+| Cuchillo / rifle | 1 · 2 · Q | D-pad / Y | Botón CAMBIAR |
+| Menú | M | Start | Botón ☰ |
+| Consola de errores | F8 | — | — |
 
 ## Ajustar el juego
 

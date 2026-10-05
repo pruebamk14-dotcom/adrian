@@ -15,6 +15,7 @@
 -- <jugador> puede ser parte del nombre, "me" o "all".
 
 local DataStoreService = game:GetService("DataStoreService")
+local LogService = game:GetService("LogService")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -325,6 +326,13 @@ COMMANDS.unban = {
 		return "Desbaneado " .. id
 	end,
 }
+COMMANDS.comandante = {
+	MinRank = "Admin",
+	Run = function()
+		Net.Event("Announce"):FireAllClients("El Comandante", "__SKYFACE__")
+		return "El Comandante aparece en el cielo"
+	end,
+}
 COMMANDS.announce = {
 	MinRank = "Admin",
 	Run = function(caller, args)
@@ -402,6 +410,19 @@ function AdminService.Start()
 	end
 	Players.PlayerRemoving:Connect(function(p)
 		rankCache[p] = nil
+	end)
+
+	-- Errores del servidor -> consola en pantalla de los admins (F8)
+	pcall(function()
+		LogService.MessageOut:Connect(function(message, messageType)
+			if messageType == Enum.MessageType.MessageError or messageType == Enum.MessageType.MessageWarning then
+				for _, p in Players:GetPlayers() do
+					if AdminService.IsAdmin(p) then
+						Net.Event("ServerLog"):FireClient(p, messageType == Enum.MessageType.MessageError, string.sub(message, 1, 600))
+					end
+				end
+			end
+		end)
 	end)
 
 	Net.Function("AdminCommand").OnServerInvoke = function(player, text)

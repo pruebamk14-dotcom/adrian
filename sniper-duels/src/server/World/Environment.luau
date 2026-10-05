@@ -45,14 +45,15 @@ function Environment.Apply()
 
 	if halloween then
 		-- Atardecer de Halloween pero CLARO: se tiene que ver bien a 300 studs
-		Lighting.ClockTime = 17.6
+		-- Entre atardecer y noche: oscuro pero con visibilidad a distancia
+		Lighting.ClockTime = 18.05
 		Lighting.GeographicLatitude = 30
-		Lighting.Brightness = 3.2
-		Lighting.Ambient = Color3.fromRGB(95, 80, 105)
-		Lighting.OutdoorAmbient = Color3.fromRGB(165, 140, 170)
+		Lighting.Brightness = 2.6
+		Lighting.Ambient = Color3.fromRGB(70, 58, 85)
+		Lighting.OutdoorAmbient = Color3.fromRGB(135, 112, 150)
 		Lighting.ColorShift_Top = Color3.fromRGB(255, 170, 90)
 		Lighting.ColorShift_Bottom = Color3.fromRGB(110, 70, 140)
-		Lighting.ExposureCompensation = 0.45
+		Lighting.ExposureCompensation = 0.3
 
 		atmo.Density = 0.24
 		atmo.Offset = 0.05
