@@ -29,10 +29,13 @@
       <div id="step-scan" class="step active">
         <h1>Escanea tu gafete para checar</h1>
         <p class="hint">Sin gafete no se puede registrar la entrada. Acerca el código QR de tu gafete a la cámara.</p>
-        <div class="camera-box">
+        <div class="camera-box" id="scanCameraBox">
           <video id="scanVideo" playsinline muted></video>
           <div class="scan-frame"></div>
         </div>
+        <label class="file-btn primary" id="scanPhotoLabel" hidden>Tomar foto del QR del gafete
+          <input type="file" id="scanPhotoInput" accept="image/*" capture="environment" hidden>
+        </label>
         <form id="scannerForm" class="scanner-form">
           <input id="scannerInput" autocomplete="off" placeholder="…o usa el lector USB / escribe el código">
           <button type="submit">OK</button>
@@ -61,11 +64,14 @@
       <div id="step-photo" class="step">
         <h1>Foto con el gafete puesto</h1>
         <p class="hint">Párate frente a la cámara con el gafete visible en tu uniforme.</p>
-        <div class="camera-box">
+        <div class="camera-box" id="photoCameraBox">
           <video id="photoVideo" playsinline muted></video>
           <div class="countdown" id="countdown"></div>
         </div>
         <button id="takePhotoBtn" class="primary big">Tomar foto</button>
+        <label class="file-btn primary big" id="photoFileLabel" hidden>Abrir cámara
+          <input type="file" id="photoFileInput" accept="image/*" capture="user" hidden>
+        </label>
         <button class="link-btn" data-cancel>Cancelar</button>
       </div>
 
@@ -192,6 +198,15 @@
       </div>
     </section>
   </main>
+
+  <!-- Ventana para gafete, cambio de PIN, confirmaciones y fotos -->
+  <div id="modal" class="modal" hidden>
+    <div class="modal-box">
+      <div id="modalBody"></div>
+      <p id="modalError" class="error"></p>
+      <div id="modalActions" class="modal-actions"></div>
+    </div>
+  </div>
 
   <!-- Hoja para imprimir el código del gafete -->
   <div id="printSheet" class="print-sheet"></div>

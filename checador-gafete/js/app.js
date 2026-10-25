@@ -46,7 +46,7 @@
       // Memoria llena: quitamos las fotos más viejas y reintentamos.
       const withPhoto = db.punches.filter(p => p.photo);
       withPhoto.slice(0, Math.ceil(withPhoto.length / 2)).forEach(p => { p.photo = ''; });
-      localStorage.setItem(KEY, JSON.stringify(db));
+      try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e2) { console.error('No se pudo guardar', e2); }
     }
   }
 
@@ -115,11 +115,11 @@
   async function startScanning() {
     const video = $('#scanVideo');
     const ok = await startCamera(video);
-    if (!ok) {
-      $('#scanError').textContent = 'No hay cámara disponible. Usa el lector USB o escribe el código del gafete.';
-      return;
-    }
-    const detector = 'BarcodeDetector' in window ? new BarcodeDetector({ formats: ['qr_code'] }) : null;
+    // Sin cámara en vivo (permiso negado o visor que no la permite): se toma una foto del QR con la cámara del teléfono.
+    $('#scanCameraBox').hidden = !ok;
+    $('#scanPhotoLabel').hidden = ok;
+    if (!ok) return;
+    const detector = qrDetector();
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
     let busy = false;
@@ -130,16 +130,7 @@
         busy = true;
         try {
           let value = null;
-          if (detector) {
-            const codes = await detector.detect(video);
-            value = codes[0]?.rawValue;
-          } else if (window.jsQR) {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0);
-            const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            value = jsQR(img.data, img.width, img.height)?.data;
-          }
+          value = await readQr(video, video.videoWidth, video.videoHeight, detector, canvas, ctx);
           if (value) { handleBadge(value); busy = false; return; }
         } catch (e) { console.warn(e); }
         busy = false;
@@ -147,6 +138,87 @@
       scanLoop = requestAnimationFrame(tick);
     };
     scanLoop = requestAnimationFrame(tick);
+  }
+
+  function qrDetector() {
+    try { return 'BarcodeDetector' in window ? new BarcodeDetector({ formats: ['qr_code'] }) : null; } catch (e) { return null; }
+  }
+
+  async function readQr(source, width, height, detector, canvas, ctx) {
+    if (detector) {
+      try {
+        const codes = await detector.detect(source);
+        if (codes[0]) return codes[0].rawValue;
+      } catch (e) { /* se intenta con jsQR */ }
+    }
+    if (!window.jsQR || !width) return null;
+    canvas.width = width;
+    canvas.height = height;
+    ctx.drawImage(source, 0, 0, width, height);
+    const img = ctx.getImageData(0, 0, width, height);
+    return jsQR(img.data, img.width, img.height)?.data || null;
+  }
+
+  function loadImageFile(file) {
+    return new Promise((resolve, reject) => {
+      const url = URL.createObjectURL(file);
+      const img = new Image();
+      img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('imagen inválida')); };
+      img.src = url;
+    });
+  }
+
+  async function scanFromPhoto(file) {
+    if (!file) return;
+    $('#scanError').textContent = 'Leyendo el código…';
+    try {
+      const img = await loadImageFile(file);
+      // Se reduce para que jsQR sea rápido con fotos grandes del teléfono.
+      const scale = Math.min(1, 1000 / Math.max(img.naturalWidth, img.naturalHeight));
+      const w = Math.round(img.naturalWidth * scale);
+      const h = Math.round(img.naturalHeight * scale);
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      const value = await readQr(img, w, h, qrDetector(), canvas, ctx);
+      if (value) return handleBadge(value);
+      $('#scanError').textContent = 'No se encontró un código QR en la foto. Acércate más al gafete y vuelve a intentar.';
+    } catch (e) {
+      $('#scanError').textContent = 'No se pudo leer la foto. Vuelve a intentar.';
+    }
+  }
+
+  function photoToDataUrl(source, srcW, srcH) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 320;
+    canvas.height = Math.round(320 * (srcH || 480) / (srcW || 640));
+    canvas.getContext('2d').drawImage(source, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.6);
+  }
+
+  // ---------------------------------------------------------------- ventana modal
+  function openModal(html, actions) {
+    $('#modalBody').innerHTML = html;
+    $('#modalError').textContent = '';
+    const box = $('#modalActions');
+    box.innerHTML = '';
+    actions.forEach(a => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = a.label;
+      if (a.cls) b.className = a.cls;
+      b.addEventListener('click', async () => {
+        const keepOpen = a.onClick ? await a.onClick() : false;
+        if (!keepOpen) closeModal();
+      });
+      box.append(b);
+    });
+    $('#modal').hidden = false;
+  }
+
+  function closeModal() {
+    $('#modal').hidden = true;
+    $('#modalBody').innerHTML = '';
   }
 
   // ---------------------------------------------------------------- kiosco
@@ -164,6 +236,9 @@
     Object.assign(session, { emp: null, method: 'badge', overrideReason: '', photo: '', pin: '' });
     $('#scanError').textContent = '';
     $('#scannerInput').value = '';
+    $('#scanPhotoInput').value = '';
+    $('#photoFileInput').value = '';
+    closeModal();
     showStep('scan');
     if ($('#view-kiosk').classList.contains('active')) {
       startScanning();
@@ -228,10 +303,10 @@
       showStep('photo');
       $('#countdown').textContent = '';
       const ok = await startCamera($('#photoVideo'));
-      if (!ok) {
-        session.photo = '';
-        return showConfirm();
-      }
+      // Sin cámara en vivo, la foto se toma con la cámara del teléfono.
+      $('#photoCameraBox').hidden = !ok;
+      $('#takePhotoBtn').hidden = !ok;
+      $('#photoFileLabel').hidden = ok;
     } else {
       showConfirm();
     }
@@ -248,16 +323,22 @@
       if (n > 0) { $('#countdown').textContent = n; return; }
       clearInterval(timer);
       $('#countdown').textContent = '';
-      const canvas = document.createElement('canvas');
-      const w = 320;
-      canvas.width = w;
-      canvas.height = Math.round(w * (video.videoHeight || 480) / (video.videoWidth || 640));
-      canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-      session.photo = canvas.toDataURL('image/jpeg', 0.6);
+      session.photo = photoToDataUrl(video, video.videoWidth, video.videoHeight);
       btn.disabled = false;
       stopCamera();
       showConfirm();
     }, 1000);
+  }
+
+  async function photoFromFile(file) {
+    if (!file) return;
+    try {
+      const img = await loadImageFile(file);
+      session.photo = photoToDataUrl(img, img.naturalWidth, img.naturalHeight);
+      showConfirm();
+    } catch (e) {
+      console.warn(e);
+    }
   }
 
   function showConfirm() {
@@ -405,26 +486,77 @@
   async function employeeAction(act, id) {
     const emp = empById(id);
     if (!emp) return;
-    if (act === 'print') return printBadge(emp);
+    if (act === 'print') return showBadge(emp);
     if (act === 'regen') {
-      if (!confirm(`¿Generar gafete nuevo para ${emp.name}? El código anterior dejará de funcionar.`)) return;
-      emp.badgeCode = newBadgeCode();
-      save();
-      return printBadge(emp);
+      return openModal(
+        `<h2>¿Gafete nuevo para ${esc(emp.name)}?</h2><p class="hint">El código anterior dejará de funcionar.</p>`,
+        [
+          { label: 'Cancelar' },
+          { label: 'Generar gafete nuevo', cls: 'primary', onClick: () => {
+            emp.badgeCode = newBadgeCode();
+            save();
+            renderTeam();
+            setTimeout(() => showBadge(emp));
+          } },
+        ]);
     }
     if (act === 'pin') {
-      const pin = prompt(`Nuevo PIN para ${emp.name} (4-6 dígitos):`);
-      if (pin === null) return;
-      if (!/^\d{4,6}$/.test(pin)) return alert('El PIN debe tener de 4 a 6 dígitos.');
-      emp.pinHash = await hash(pin);
+      return openModal(
+        `<h2>Nuevo PIN para ${esc(emp.name)}</h2>
+         <input id="newEmpPin" type="password" inputmode="numeric" placeholder="4 a 6 dígitos" autocomplete="off">`,
+        [
+          { label: 'Cancelar' },
+          { label: 'Guardar PIN', cls: 'primary', onClick: async () => {
+            const pin = $('#newEmpPin').value;
+            if (!/^\d{4,6}$/.test(pin)) {
+              $('#modalError').textContent = 'El PIN debe tener de 4 a 6 dígitos.';
+              return true;
+            }
+            emp.pinHash = await hash(pin);
+            save();
+          } },
+        ]);
     }
     if (act === 'toggle') emp.active = !emp.active;
     save();
     renderTeam();
   }
 
+  // En una página normal se puede imprimir; dentro de un visor incrustado no.
+  const canPrint = window.self === window.top;
+
+  function drawQr(target, code) {
+    new QRCode(target, { text: code, width: 256, height: 256, correctLevel: QRCode.CorrectLevel.M });
+  }
+
+  function showBadge(emp) {
+    if (!window.QRCode) {
+      return openModal('<h2>No se pudo cargar el generador de QR</h2>', [{ label: 'Cerrar' }]);
+    }
+    const actions = [{ label: 'Cerrar' }];
+    actions.unshift({ label: 'Copiar código', onClick: async () => {
+      try {
+        await navigator.clipboard.writeText(emp.badgeCode);
+        $('#modalBody .hint').textContent = 'Código copiado.';
+      } catch (e) {
+        const range = document.createRange();
+        range.selectNodeContents($('#modalBody .code-text'));
+        getSelection().removeAllRanges();
+        getSelection().addRange(range);
+      }
+      return true;
+    } });
+    if (canPrint) actions.unshift({ label: 'Imprimir', cls: 'primary', onClick: () => printBadge(emp) });
+    openModal(
+      `<h2>${esc(emp.name)}</h2>
+       <div class="qr-box" id="qrModal"></div>
+       <div class="code-text">${esc(emp.badgeCode)}</div>
+       <p class="hint">Imprime este QR (o toma captura de pantalla) y pégalo en el gafete.</p>`,
+      actions);
+    drawQr($('#qrModal'), emp.badgeCode);
+  }
+
   function printBadge(emp) {
-    if (!window.QRCode) return alert('No se pudo cargar el generador de QR. Revisa la conexión a internet.');
     const sheet = $('#printSheet');
     sheet.innerHTML = `
       <div class="sticker">
@@ -432,7 +564,7 @@
         <div class="name">${esc(emp.name)}</div>
         <div class="code">${esc(emp.badgeCode)}</div>
       </div>`;
-    new QRCode($('#qrTarget'), { text: emp.badgeCode, width: 256, height: 256, correctLevel: QRCode.CorrectLevel.M });
+    drawQr($('#qrTarget'), emp.badgeCode);
     // Espera a que se dibuje el QR antes de abrir el diálogo de impresión.
     setTimeout(() => window.print(), 300);
   }
@@ -482,12 +614,23 @@
         p.overrideBy || '',
       ];
     });
-    const csv = [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const csv = '\ufeff' + [header, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const filename = `checadas-${$('#logDate').value}.csv`;
+    if (downloads) {
+      downloads.save({ filename, data: csv }).catch(e => console.warn('Descarga no realizada', e));
+      return;
+    }
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }));
-    a.download = `checadas-${$('#logDate').value}.csv`;
+    a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(a.href);
+  }
+
+  // Dentro de claude.ai las descargas pasan por el visor; fuera de él se usa un enlace normal.
+  let downloads = null;
+  if (window.claude?.use) {
+    window.claude.use('downloads').then(d => { downloads = d; }).catch(() => {});
   }
 
   function fillSettings() {
@@ -558,8 +701,11 @@
     $('#logDate').addEventListener('change', renderLog);
     $('#exportBtn').addEventListener('click', exportCsv);
     $('#logTable').addEventListener('click', e => {
-      if (e.target.matches('img[data-full]')) window.open().document.write(`<img src="${e.target.src}" style="width:100%">`);
+      if (e.target.matches('img[data-full]')) openModal(`<img src="${e.target.src}" alt="Foto de la checada">`, [{ label: 'Cerrar' }]);
     });
+    $('#scanPhotoInput').addEventListener('change', e => scanFromPhoto(e.target.files[0]));
+    $('#photoFileInput').addEventListener('change', e => photoFromFile(e.target.files[0]));
+    $('#modal').addEventListener('click', e => { if (e.target.id === 'modal') closeModal(); });
     $('#settingsForm').addEventListener('submit', e => { e.preventDefault(); saveSettings(e.target); });
   }
 
