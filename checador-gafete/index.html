@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Checador con Gafete</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <!-- Lector QR (respaldo cuando el navegador no tiene BarcodeDetector) y generador de QR para imprimir gafetes; incluidos localmente para funcionar sin internet -->
+  <script src="vendor/jsQR.js"></script>
+  <script src="vendor/qrcode.min.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo">⏱</span>
+      <span id="storeName">Checador</span>
+    </div>
+    <div id="clock" class="clock"></div>
+    <nav>
+      <button class="nav-btn active" data-view="kiosk">Checar</button>
+      <button class="nav-btn" data-view="admin">Gerente</button>
+    </nav>
+  </header>
+
+  <main>
+    <!-- ================= KIOSCO ================= -->
+    <section id="view-kiosk" class="view active">
+      <!-- Paso 1: escanear gafete -->
+      <div id="step-scan" class="step active">
+        <h1>Escanea tu gafete para checar</h1>
+        <p class="hint">Sin gafete no se puede registrar la entrada. Acerca el código QR de tu gafete a la cámara.</p>
+        <div class="camera-box">
+          <video id="scanVideo" playsinline muted></video>
+          <div class="scan-frame"></div>
+        </div>
+        <form id="scannerForm" class="scanner-form">
+          <input id="scannerInput" autocomplete="off" placeholder="…o usa el lector USB / escribe el código">
+          <button type="submit">OK</button>
+        </form>
+        <p id="scanError" class="error"></p>
+        <button id="noBadgeBtn" class="link-btn">No traigo mi gafete</button>
+      </div>
+
+      <!-- Paso 2: PIN -->
+      <div id="step-pin" class="step">
+        <div class="who">
+          <div class="avatar" id="whoInitials"></div>
+          <div>
+            <h2 id="whoName"></h2>
+            <p id="whoRole" class="muted"></p>
+          </div>
+        </div>
+        <h1>Ingresa tu PIN</h1>
+        <div class="pin-dots" id="pinDots"></div>
+        <div class="keypad" id="keypad"></div>
+        <p id="pinError" class="error"></p>
+        <button class="link-btn" data-cancel>Cancelar</button>
+      </div>
+
+      <!-- Paso 3: foto con el gafete puesto -->
+      <div id="step-photo" class="step">
+        <h1>Foto con el gafete puesto</h1>
+        <p class="hint">Párate frente a la cámara con el gafete visible en tu uniforme.</p>
+        <div class="camera-box">
+          <video id="photoVideo" playsinline muted></video>
+          <div class="countdown" id="countdown"></div>
+        </div>
+        <button id="takePhotoBtn" class="primary big">Tomar foto</button>
+        <button class="link-btn" data-cancel>Cancelar</button>
+      </div>
+
+      <!-- Paso 4: confirmar entrada/salida -->
+      <div id="step-confirm" class="step">
+        <h1 id="confirmTitle"></h1>
+        <img id="confirmPhoto" class="confirm-photo" alt="">
+        <div class="punch-buttons">
+          <button class="primary big" data-punch="in">Entrada</button>
+          <button class="big" data-punch="break_start">Inicio descanso</button>
+          <button class="big" data-punch="break_end">Fin descanso</button>
+          <button class="danger big" data-punch="out">Salida</button>
+        </div>
+        <button class="link-btn" data-cancel>Cancelar</button>
+      </div>
+
+      <!-- Sin gafete: autorización del gerente -->
+      <div id="step-override" class="step">
+        <h1>Sin gafete</h1>
+        <p class="hint">Para checar sin gafete se necesita la autorización de un gerente. Quedará registrado como incidente.</p>
+        <label>Empleado
+          <select id="overrideEmp"></select>
+        </label>
+        <label>PIN del gerente
+          <input id="overridePin" type="password" inputmode="numeric" autocomplete="off">
+        </label>
+        <label>Motivo
+          <select id="overrideReason">
+            <option>Olvidó el gafete</option>
+            <option>Gafete perdido</option>
+            <option>Gafete dañado / no escanea</option>
+            <option>Empleado nuevo sin gafete</option>
+          </select>
+        </label>
+        <p id="overrideError" class="error"></p>
+        <button id="overrideBtn" class="primary big">Autorizar</button>
+        <button class="link-btn" data-cancel>Cancelar</button>
+      </div>
+
+      <!-- Resultado -->
+      <div id="step-done" class="step">
+        <div class="done-icon" id="doneIcon">✔</div>
+        <h1 id="doneTitle"></h1>
+        <p id="doneMsg" class="hint"></p>
+      </div>
+    </section>
+
+    <!-- ================= GERENTE ================= -->
+    <section id="view-admin" class="view">
+      <div id="adminLock" class="card narrow">
+        <h1 id="adminLockTitle">Acceso de gerente</h1>
+        <p id="adminLockHint" class="hint"></p>
+        <input id="adminPin" type="password" inputmode="numeric" placeholder="PIN de gerente" autocomplete="off">
+        <input id="adminPin2" type="password" inputmode="numeric" placeholder="Repite el PIN" autocomplete="off" hidden>
+        <p id="adminError" class="error"></p>
+        <button id="adminLoginBtn" class="primary">Entrar</button>
+      </div>
+
+      <div id="adminPanel" hidden>
+        <div class="tabs">
+          <button class="tab active" data-tab="team">Empleados</button>
+          <button class="tab" data-tab="log">Registros</button>
+          <button class="tab" data-tab="incidents">Incidentes sin gafete</button>
+          <button class="tab" data-tab="settings">Ajustes</button>
+          <button id="lockBtn" class="tab right">Cerrar sesión</button>
+        </div>
+
+        <div class="tab-panel active" id="tab-team">
+          <form id="empForm" class="card row-form">
+            <h2>Agregar empleado</h2>
+            <input name="name" placeholder="Nombre" required>
+            <input name="role" placeholder="Puesto (ej. Crew Trainer)">
+            <input name="pin" placeholder="PIN (4-6 dígitos)" inputmode="numeric" pattern="\d{4,6}" required>
+            <button class="primary">Agregar</button>
+          </form>
+          <div class="card">
+            <h2>Equipo</h2>
+            <table>
+              <thead><tr><th>Nombre</th><th>Puesto</th><th>Estado</th><th>Incidentes</th><th></th></tr></thead>
+              <tbody id="empTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="tab-log">
+          <div class="card">
+            <div class="row">
+              <h2>Registros</h2>
+              <input type="date" id="logDate">
+              <button id="exportBtn">Exportar CSV</button>
+            </div>
+            <table>
+              <thead><tr><th>Hora</th><th>Empleado</th><th>Tipo</th><th>Método</th><th>Foto</th></tr></thead>
+              <tbody id="logTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="tab-incidents">
+          <div class="card">
+            <h2>Checadas sin gafete</h2>
+            <p class="hint">Cada vez que alguien checa sin gafete queda aquí, con el gerente que autorizó y el motivo.</p>
+            <table>
+              <thead><tr><th>Fecha</th><th>Empleado</th><th>Motivo</th><th>Autorizó</th></tr></thead>
+              <tbody id="incTable"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="tab-panel" id="tab-settings">
+          <form id="settingsForm" class="card narrow">
+            <h2>Ajustes</h2>
+            <label>Nombre de la tienda <input name="storeName"></label>
+            <label class="check"><input type="checkbox" name="requirePhoto"> Pedir foto con el gafete puesto al checar</label>
+            <label>Nombre del gerente (para el registro) <input name="managerName"></label>
+            <label>Nuevo PIN de gerente (dejar vacío para no cambiar)
+              <input name="managerPin" type="password" inputmode="numeric" pattern="\d{4,8}">
+            </label>
+            <label>Guardar fotos por (días) <input name="photoDays" type="number" min="1" max="90"></label>
+            <button class="primary">Guardar</button>
+            <p id="settingsMsg" class="ok"></p>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- Hoja para imprimir el código del gafete -->
+  <div id="printSheet" class="print-sheet"></div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
