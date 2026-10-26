@@ -39,12 +39,11 @@ window.CHURCH = {
   // Fotos de la galería. Coloca las fotos en assets/img/ y agrega aquí sus nombres.
   // Ej: { src: "assets/img/culto1.jpg", caption: "Culto de domingo" }
   gallery: [
-    { src: "assets/img/foto1.jpg", caption: "Culto dominical" },
-    { src: "assets/img/foto2.jpg", caption: "Alabanza" },
-    { src: "assets/img/foto3.jpg", caption: "Bautismos" },
-    { src: "assets/img/foto4.jpg", caption: "Comunidad" },
-    { src: "assets/img/foto5.jpg", caption: "Niños" },
-    { src: "assets/img/foto6.jpg", caption: "Jóvenes" }
+    { src: "assets/img/alabanza.jpg",    caption: "Alabanza" },
+    { src: "assets/img/jovenes.jpg",     caption: "Jóvenes" },
+    { src: "assets/img/comunidad.jpg",   caption: "Comunión entre hermanos" },
+    { src: "assets/img/familia.jpg",     caption: "Familia de fe" },
+    { src: "assets/img/predicacion.jpg", caption: "La Palabra" }
   ],
 
   /* Conexión con un servidor para que las peticiones lleguen al pastor y

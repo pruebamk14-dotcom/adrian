@@ -175,6 +175,9 @@ p { margin: 0 0 1em; }
   position: relative; min-height: 100svh; display: grid; place-items: center;
   overflow: hidden; padding: 120px 16px 80px; isolation: isolate;
 }
+.hero-photo { position: absolute; inset: -40px; z-index: -3; background: url("../img/alabanza.jpg") center/cover; filter: blur(14px) saturate(1.2); opacity: .28; }
+.hero-photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, var(--bg)); }
+:root[data-theme="light"] .hero-photo { opacity: .18; }
 #heroCanvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: -1; }
 .aurora { position: absolute; inset: -20%; z-index: -2; filter: blur(80px); opacity: .55; }
 .aurora i { position: absolute; border-radius: 50%; animation: float 18s ease-in-out infinite; }
