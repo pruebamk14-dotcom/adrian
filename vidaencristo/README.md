@@ -1,6 +1,6 @@
 # Iglesia Bautista Vida en Cristo — Sitio web
 
-Sitio estático (HTML + CSS + JS, sin dependencias) para la Iglesia Bautista Vida en Cristo, South Houston, Texas. Pastor: Liván Quintana.
+Sitio estático (HTML + CSS + JS, sin dependencias) para la Iglesia Bautista Vida en Cristo, 18131 Nassau Bay Dr, Houston, TX 77058. Cultos: domingos 12:45 PM. Pastor: Liván Quintana.
 
 ## Ver el sitio en tu computadora
 

@@ -255,7 +255,7 @@ p { margin: 0 0 1em; }
 @media (max-width: 860px) { .about-grid { grid-template-columns: 1fr; gap: 3rem; } .pastor-card { max-width: 420px; margin-inline: auto; width: 100%; } }
 
 /* Schedule */
-.schedule { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1rem; }
+.schedule { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 360px)); justify-content: center; gap: 1rem; }
 .svc {
   position: relative; padding: 1.6rem; border-radius: var(--radius); border: 1px solid var(--border);
   background: var(--surface); overflow: hidden; transition: transform .3s var(--ease), border-color .3s;
@@ -514,6 +514,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 /* ---------- Visit ---------- */
 .visit-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; align-items: center; }
 @media (max-width: 900px) { .visit-grid { grid-template-columns: 1fr; } }
+.visit-addr { font-size: 1.05rem; color: var(--muted); line-height: 1.8; }
 .faq { list-style: none; padding: 0; margin: 1.5rem 0; display: grid; gap: .6rem; }
 .faq details { border: 1px solid var(--border); border-radius: 16px; background: var(--surface); padding: 0 1.2rem; transition: border-color .2s; }
 .faq details[open] { border-color: var(--gold); }

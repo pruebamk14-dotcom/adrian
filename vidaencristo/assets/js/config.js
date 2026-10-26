@@ -7,20 +7,16 @@ window.CHURCH = {
   name: "Iglesia Bautista Vida en Cristo",
   facebook: "https://www.facebook.com/vidaencristotexas/",
 
-  // Dirección exacta del templo (para el mapa y el botón "Cómo llegar").
-  // CAMBIAR por la dirección real, ej: "1234 Main St, South Houston, TX 77587"
-  address: "South Houston, TX",
+  // Dirección del templo (para el mapa y el botón "Cómo llegar").
+  address: "18131 Nassau Bay Dr, Houston, TX 77058",
 
   // Zona horaria de la iglesia
   timezone: "America/Chicago",
 
   // Cultos semanales. day: 0=Domingo, 1=Lunes … 6=Sábado. time: "HH:MM" (24h)
-  // CONFIRMAR con el pastor y ajustar.
+  // Agrega aquí otras reuniones fijas (estudio bíblico, jóvenes…) cuando se confirmen.
   services: [
-    { day: 0, time: "11:00", title: "Culto Dominical",       desc: "Alabanza, oración y la Palabra" },
-    { day: 3, time: "19:30", title: "Estudio Bíblico",        desc: "Crecemos juntos en la fe" },
-    { day: 5, time: "19:30", title: "Jóvenes",                desc: "Reunión de jóvenes" },
-    { day: 6, time: "10:00", title: "Mujeres de Propósito",   desc: "Un sábado al mes" }
+    { day: 0, time: "12:45", title: "Culto Dominical", desc: "En la capilla · Alabanza, oración y la Palabra" }
   ],
 
   youthEvents: [
@@ -43,7 +39,10 @@ window.CHURCH = {
     { src: "assets/img/jovenes.jpg",     caption: "Jóvenes" },
     { src: "assets/img/comunidad.jpg",   caption: "Comunión entre hermanos" },
     { src: "assets/img/familia.jpg",     caption: "Familia de fe" },
-    { src: "assets/img/predicacion.jpg", caption: "La Palabra" }
+    { src: "assets/img/predicacion.jpg", caption: "La Palabra" },
+    { src: "assets/img/celebracion.jpg", caption: "Celebrando juntos" },
+    { src: "assets/img/servicio.jpg",    caption: "Sirviendo a la comunidad" },
+    { src: "assets/img/encuentro.jpg",   caption: "Encuentro con Jesús" }
   ],
 
   /* Conexión con un servidor para que las peticiones lleguen al pastor y

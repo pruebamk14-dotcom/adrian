@@ -695,6 +695,7 @@
     img.addEventListener("error", () => img.remove());
     img.addEventListener("load", () => ph.remove());
     fig.append(ph, img, el("figcaption", { text: g.caption }));
+    if (img.complete && img.naturalWidth) ph.remove();
     fig.addEventListener("click", () => {
       if (!fig.contains(img) || !img.complete) return;
       const lb = el("div", { class: "lightbox", role: "dialog", "aria-label": g.caption }, el("img", { src: g.src, alt: g.caption }));
