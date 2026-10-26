@@ -488,6 +488,10 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--g
 .min-card::after { content: ""; position: absolute; inset: 0; background: radial-gradient(400px circle at var(--x, 50%) var(--y, 50%), rgba(245,196,107,.12), transparent 50%); opacity: 0; transition: opacity .3s; pointer-events: none; }
 .min-card:hover { border-color: color-mix(in srgb, var(--gold) 50%, var(--border)); }
 .min-card:hover::after { opacity: 1; }
+.min-photo { margin: -2rem -2rem 1.2rem; height: 170px; background: center/cover; position: relative; transition: transform .8s var(--ease); }
+.min-photo::after { content: ""; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, var(--bg)); }
+.min-card:hover .min-photo { transform: scale(1.05); }
+.min-photo + .min-ico { margin-top: -2.8rem; position: relative; z-index: 1; }
 .min-ico { font-size: 2.2rem; margin-bottom: 1rem; transform: translateZ(30px); }
 .min-card p { color: var(--muted); margin: 0; }
 

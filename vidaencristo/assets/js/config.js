@@ -42,7 +42,12 @@ window.CHURCH = {
     { src: "assets/img/predicacion.jpg", caption: "La Palabra" },
     { src: "assets/img/celebracion.jpg", caption: "Celebrando juntos" },
     { src: "assets/img/servicio.jpg",    caption: "Sirviendo a la comunidad" },
-    { src: "assets/img/encuentro.jpg",   caption: "Encuentro con Jesús" }
+    { src: "assets/img/encuentro.jpg",   caption: "Encuentro con Jesús" },
+    { src: "assets/img/coro-ninos.jpg",  caption: "Coro de niños" },
+    { src: "assets/img/abrazo.jpg",      caption: "Un abrazo de hermanos" },
+    { src: "assets/img/discipulado.jpg", caption: "Creciendo en la fe" },
+    { src: "assets/img/predicacion2.jpg", caption: "Predicación" },
+    { src: "assets/img/ninos.jpg",       caption: "Los más pequeños" }
   ],
 
   /* Conexión con un servidor para que las peticiones lleguen al pastor y
