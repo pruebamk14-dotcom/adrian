@@ -161,17 +161,24 @@
   const services = (C.services || []).slice();
   const nowInTz = () => new Date(new Date().toLocaleString("en-US", { timeZone: C.timezone || "America/Chicago" }));
 
+  const ORD = ["", "1er", "2º", "3er", "4º", "5º"];
+  const dayLabel = (s) => s.nth ? `${ORD[s.nth]} ${DAYS[s.day].toLowerCase()} del mes` : DAYS[s.day];
+  const matches = (s, d) => d.getDay() === s.day && (!s.nth || Math.ceil(d.getDate() / 7) === s.nth);
+  // Próximas fechas de una reunión (semanal o mensual), incluyendo la que esté en curso
+  const occurrences = (s, from, count = 1) => {
+    const [h, m] = s.time.split(":").map(Number), out = [];
+    for (let add = 0; add <= 400 && out.length < count; add++) {
+      const d = new Date(from); d.setDate(from.getDate() + add); d.setHours(h, m, 0, 0);
+      if (matches(s, d) && (d > from || from - d < 90 * 60000)) out.push(d);
+    }
+    return out;
+  };
   const nextService = () => {
     const now = nowInTz();
     let best = null;
     for (const s of services) {
-      const [h, m] = s.time.split(":").map(Number);
-      for (let add = 0; add <= 7; add++) {
-        const d = new Date(now); d.setDate(now.getDate() + add); d.setHours(h, m, 0, 0);
-        if (d.getDay() !== s.day) continue;
-        const live = now >= d && now - d < 90 * 60000;
-        if (d > now || live) { if (!best || d < best.at) best = { s, at: d, live }; break; }
-      }
+      const [d] = occurrences(s, now);
+      if (d && (!best || d < best.at)) best = { s, at: d, live: now >= d };
     }
     return best ? { ...best, now } : null;
   };
@@ -181,7 +188,7 @@
     const nx = nextService();
     box.replaceChildren(...services.map(s => {
       const card = el("article", { class: "svc reveal" + (nx && nx.s === s ? " next" : "") },
-        el("div", { class: "day", text: DAYS[s.day] }),
+        el("div", { class: "day", text: dayLabel(s) }),
         el("div", { class: "time", text: fmt12(s.time) }),
         el("h3", { text: s.title }),
         el("p", { text: s.desc }),
@@ -193,20 +200,19 @@
   };
 
   const downloadIcs = (s) => {
-    const nx = new Date(); const [h, m] = s.time.split(":").map(Number);
-    while (nx.getDay() !== s.day) nx.setDate(nx.getDate() + 1);
+    const [nx] = occurrences(s, nowInTz()); const [h, m] = s.time.split(":").map(Number);
     const p = (n) => String(n).padStart(2, "0");
     const dt = `${nx.getFullYear()}${p(nx.getMonth() + 1)}${p(nx.getDate())}T${p(h)}${p(m)}00`;
     const end = `${nx.getFullYear()}${p(nx.getMonth() + 1)}${p(nx.getDate())}T${p((h + 1) % 24)}${p(m)}30`;
     const byday = ["SU", "MO", "TU", "WE", "TH", "FR", "SA"][s.day];
     const ics = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//VidaEnCristo//ES", "BEGIN:VEVENT",
       `UID:${uid()}@vidaencristo`, `DTSTART;TZID=${C.timezone}:${dt}`, `DTEND;TZID=${C.timezone}:${end}`,
-      `RRULE:FREQ=WEEKLY;BYDAY=${byday}`, `SUMMARY:${s.title} · Vida en Cristo`, `LOCATION:${C.address}`,
+      s.nth ? `RRULE:FREQ=MONTHLY;BYDAY=${s.nth}${byday}` : `RRULE:FREQ=WEEKLY;BYDAY=${byday}`, `SUMMARY:${s.title} · Vida en Cristo`, `LOCATION:${C.address}`,
       "BEGIN:VALARM", "TRIGGER:-PT60M", "ACTION:DISPLAY", "DESCRIPTION:Recordatorio", "END:VALARM",
       "END:VEVENT", "END:VCALENDAR"].join("\r\n");
     const a = el("a", { href: URL.createObjectURL(new Blob([ics], { type: "text/calendar" })), download: "vida-en-cristo.ics" });
     a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    toast("📅 Evento semanal descargado con recordatorio");
+    toast(s.nth ? "📅 Evento mensual descargado con recordatorio" : "📅 Evento semanal descargado con recordatorio");
   };
 
   const tickCountdown = () => {
@@ -228,7 +234,7 @@
     $("#cdTitle").textContent = `Próximo: ${nx.s.title}`;
     $("#cdD").textContent = d; $("#cdH").textContent = String(hh).padStart(2, "0");
     $("#cdM").textContent = String(mm).padStart(2, "0"); $("#cdS").textContent = String(ss).padStart(2, "0");
-    $("#cdWhen").textContent = `${DAYS[nx.s.day]} · ${fmt12(nx.s.time)} (hora de Texas)`;
+    $("#cdWhen").textContent = `${nx.at.toLocaleDateString("es-US", { weekday: "long", day: "numeric", month: "long" })} · ${fmt12(nx.s.time)} (hora de Texas)`;
   };
   renderSchedule(); tickCountdown(); setInterval(tickCountdown, 1000);
 
@@ -636,7 +642,9 @@
 
   // youth events
   const upcoming = (arr) => arr.filter(e => parseDate(e.date) >= new Date(new Date().toDateString())).sort((a, b) => parseDate(a.date) - parseDate(b.date));
-  const ye = upcoming(C.youthEvents || []);
+  const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const recurring = services.filter(s => s.group === "jovenes").flatMap(s => occurrences(s, nowInTz(), 3).map(d => ({ date: iso(d), title: `${s.title} · ${fmt12(s.time)}` })));
+  const ye = upcoming([...recurring, ...(C.youthEvents || [])]);
   $("#youthEvents").replaceChildren(...(ye.length ? ye.slice(0, 3).map(ev => { const d = parseDate(ev.date);
     return el("li", {}, el("div", { class: "d" }, el("span", {}, String(d.getDate()), el("small", { text: MONTHS[d.getMonth()] }))), el("b", { text: ev.title })); })
     : [el("li", { class: "small", text: "Pronto anunciaremos nuevas actividades." })]));
@@ -687,7 +695,7 @@
      Gallery + Facebook live feed + map
      ========================================================= */
   const gal = $("#gallery");
-  const renderGallery = (items) => gal.replaceChildren(...items.slice(0, 16).map(g => {
+  const renderGallery = (items) => gal.replaceChildren(...items.slice(0, 24).map(g => {
     const fig = el("figure", { class: "g", style: "margin:0" });
     const ph = el("div", { class: "ph" });
     ph.innerHTML = '<div><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 17-5-5-8 8"/></svg>Foto: ' + g.caption.replace(/[<>&]/g, "") + "</div>";

@@ -13,17 +13,18 @@ window.CHURCH = {
   // Zona horaria de la iglesia
   timezone: "America/Chicago",
 
-  // Cultos semanales. day: 0=Domingo, 1=Lunes … 6=Sábado. time: "HH:MM" (24h)
+  // Reuniones. day: 0=Domingo, 1=Lunes … 6=Sábado. time: "HH:MM" (24h)
+  // nth: (opcional) para reuniones mensuales, ej. nth: 2 = segundo <día> del mes.
+  // group: "jovenes" hace que la reunión aparezca también en la sección de Jóvenes.
   // Agrega aquí otras reuniones fijas (estudio bíblico, jóvenes…) cuando se confirmen.
   services: [
-    { day: 0, time: "12:45", title: "Culto Dominical", desc: "En la capilla · Alabanza, oración y la Palabra" }
+    { day: 0, time: "12:45", title: "Culto Dominical", desc: "En la capilla · Alabanza, oración y la Palabra" },
+    { day: 0, nth: 2, time: "13:25", title: "Jóvenes: Camino a la madurez", desc: "Salón #113 · ¡Trae tu Biblia!", group: "jovenes" }
   ],
 
-  youthEvents: [
-    { date: "2026-11-14", title: "Noche de alabanza y pizza" },
-    { date: "2026-11-28", title: "Fogata de acción de gracias" },
-    { date: "2026-12-19", title: "Campamento de invierno" }
-  ],
+  // Actividades especiales de jóvenes (las reuniones mensuales salen solas de "services").
+  // Ej: { date: "2026-12-19", title: "Campamento de invierno" }
+  youthEvents: [],
 
   womenEvents: [
     { date: "2026-11-08", title: "Desayuno de Mujeres", desc: "Un tiempo de compañerismo, testimonio y oración.", emoji: "☕" },
@@ -36,6 +37,7 @@ window.CHURCH = {
   // Ej: { src: "assets/img/culto1.jpg", caption: "Culto de domingo" }
   gallery: [
     { src: "assets/img/alabanza.jpg",    caption: "Alabanza" },
+    { src: "assets/img/jovenes-grupo.jpg", caption: "Jóvenes Vida en Cristo" },
     { src: "assets/img/jovenes.jpg",     caption: "Jóvenes" },
     { src: "assets/img/comunidad.jpg",   caption: "Comunión entre hermanos" },
     { src: "assets/img/familia.jpg",     caption: "Familia de fe" },
@@ -47,7 +49,8 @@ window.CHURCH = {
     { src: "assets/img/abrazo.jpg",      caption: "Un abrazo de hermanos" },
     { src: "assets/img/discipulado.jpg", caption: "Creciendo en la fe" },
     { src: "assets/img/predicacion2.jpg", caption: "Predicación" },
-    { src: "assets/img/ninos.jpg",       caption: "Los más pequeños" }
+    { src: "assets/img/ninos.jpg",       caption: "Los más pequeños" },
+    { src: "assets/img/jovenes-grupo2.jpg", caption: "Jóvenes en equipo" }
   ],
 
   /* Conexión con un servidor para que las peticiones lleguen al pastor y
