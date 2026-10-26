@@ -9,7 +9,7 @@
   <meta property="og:title" content="Iglesia Bautista Vida en Cristo">
   <meta property="og:description" content="Una iglesia hispana en Houston, abierta a todos. Domingos 12:45 PM. Ven tal como eres.">
   <meta property="og:type" content="website">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230b1020'/%3E%3Cpath d='M28 10h8v16h14v8H36v20h-8V34H14v-8h14z' fill='%23f5c46b'/%3E%3C/svg%3E">
+  <link rel="icon" href="assets/img/mark.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..800;1,9..144,300..700&family=Inter:wght@300..700&display=swap" rel="stylesheet">
@@ -21,25 +21,46 @@
     "name": "Iglesia Bautista Vida en Cristo",
     "address": { "@type": "PostalAddress", "streetAddress": "18131 Nassau Bay Dr", "addressLocality": "Houston", "addressRegion": "TX", "postalCode": "77058", "addressCountry": "US" },
     "event": { "@type": "Event", "name": "Culto Dominical", "eventSchedule": { "@type": "Schedule", "byDay": "https://schema.org/Sunday", "startTime": "12:45", "repeatFrequency": "P1W" } },
-    "sameAs": ["https://www.facebook.com/vidaencristotexas/"],
+    "sameAs": ["https://www.facebook.com/vidaencristotexas/", "https://www.instagram.com/iglesiavidaen_cristo/"],
+    "logo": "assets/img/logo.svg",
     "employee": { "@type": "Person", "name": "Liván Quintana", "jobTitle": "Pastor" }
   }
   </script>
 </head>
 <body>
+  <div class="preloader" id="preloader" aria-hidden="true">
+    <div class="pre-logo"><svg class="logo logo-pre" viewBox="0 0 240 240" role="img" aria-label="Logo Iglesia Bautista Vida en Cristo">
+  <defs>
+    <path id="pl-ring" d="M54.95,185.05 A92,92 0 1,1 55.06,185.17"/>
+    <linearGradient id="pl-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe7b0"/><stop offset="1" stop-color="#e89b3c"/></linearGradient>
+    <clipPath id="pl-clip"><circle cx="120" cy="120" r="80"/></clipPath>
+  </defs>
+  <circle class="logo-halo" cx="120" cy="120" r="80"/>
+  <g class="logo-cross" fill="url(#pl-gold)"><rect x="110" y="38" width="20" height="124" rx="3"/><rect x="76" y="70" width="88" height="19" rx="3"/></g>
+  <g clip-path="url(#pl-clip)" fill="none" stroke-linecap="round">
+    <path class="logo-wave w1" d="M28 160 Q78 126 128 146 T214 140" stroke="#5fae6e" stroke-width="11"/>
+    <path class="logo-wave w2" d="M26 180 Q84 150 136 170 T214 164" stroke="#3d86c6" stroke-width="11"/>
+    <path class="logo-wave w3" d="M30 198 Q88 172 140 190 T214 186" stroke="#2a5f9a" stroke-width="7"/>
+  </g>
+  <text class="logo-ibvc" x="120" y="134" text-anchor="middle">IBVC</text>
+  <g class="logo-ring"><text><textPath href="#pl-ring" textLength="415" lengthAdjust="spacing">IGLESIA BAUTISTA VIDA EN CRISTO</textPath></text></g>
+  <g class="logo-branch"><path d="M172 206 C 196 182, 206 146, 200 104" fill="none"/><ellipse cx="177.6" cy="189.4" rx="6.5" ry="2.6" transform="rotate(-55 177.6 189.4)" style="--i:0"/><ellipse cx="182.4" cy="202.6" rx="6.5" ry="2.6" transform="rotate(15 182.4 202.6)" style="--i:0"/><ellipse cx="187.0" cy="178.3" rx="6.5" ry="2.6" transform="rotate(-70 187.0 178.3)" style="--i:1"/><ellipse cx="195.0" cy="189.7" rx="6.5" ry="2.6" transform="rotate(0 195.0 189.7)" style="--i:1"/><ellipse cx="192.6" cy="165.5" rx="6.5" ry="2.6" transform="rotate(-85 192.6 165.5)" style="--i:2"/><ellipse cx="203.4" cy="174.5" rx="6.5" ry="2.6" transform="rotate(-15 203.4 174.5)" style="--i:2"/><ellipse cx="196.7" cy="151.0" rx="6.5" ry="2.6" transform="rotate(-100 196.7 151.0)" style="--i:3"/><ellipse cx="209.3" cy="157.0" rx="6.5" ry="2.6" transform="rotate(-30 209.3 157.0)" style="--i:3"/><ellipse cx="197.1" cy="136.8" rx="6.5" ry="2.6" transform="rotate(-115 197.1 136.8)" style="--i:4"/><ellipse cx="210.9" cy="139.2" rx="6.5" ry="2.6" transform="rotate(-45 210.9 139.2)" style="--i:4"/><ellipse cx="196.0" cy="122.6" rx="6.5" ry="2.6" transform="rotate(-130 196.0 122.6)" style="--i:5"/><ellipse cx="210.0" cy="121.4" rx="6.5" ry="2.6" transform="rotate(-60 210.0 121.4)" style="--i:5"/><ellipse cx="194.4" cy="110.4" rx="6.5" ry="2.6" transform="rotate(-145 194.4 110.4)" style="--i:6"/><ellipse cx="207.6" cy="105.6" rx="6.5" ry="2.6" transform="rotate(-75 207.6 105.6)" style="--i:6"/></g>
+</svg></div>
+    <p class="pre-verse">“Yo soy el camino, la verdad y la vida”</p>
+  </div>
+  <div class="scroll-progress" aria-hidden="true"><span id="scrollBar"></span></div>
   <div class="cursor-glow" aria-hidden="true"></div>
   <a class="skip" href="#main">Saltar al contenido</a>
 
   <!-- ============ NAV ============ -->
   <header class="nav" id="nav">
     <a href="#inicio" class="brand" aria-label="Vida en Cristo, inicio">
-      <span class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 32 32"><path d="M14 4h4v9h9v4h-9v11h-4V17H5v-4h9z"/></svg>
-      </span>
+      <span class="brand-mark" aria-hidden="true"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="mk-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe7b0"/><stop offset="1" stop-color="#e89b3c"/></linearGradient><clipPath id="mk-c"><circle cx="32" cy="32" r="30"/></clipPath></defs><circle cx="32" cy="32" r="30" fill="#0e1630"/><g clip-path="url(#mk-c)"><rect x="28" y="9" width="8" height="40" rx="1.5" fill="url(#mk-g)"/><rect x="17" y="19" width="30" height="7" rx="1.5" fill="url(#mk-g)"/><path d="M2 44 Q18 34 32 40 T64 38" stroke="#5fae6e" stroke-width="5" fill="none"/><path d="M2 52 Q20 42 34 48 T64 47" stroke="#3d86c6" stroke-width="5" fill="none"/></g><circle cx="32" cy="32" r="30" fill="none" stroke="url(#mk-g)" stroke-width="1.5"/></svg></span>
       <span class="brand-text">Vida en Cristo<small>Iglesia Bautista · Texas</small></span>
     </a>
     <nav class="nav-links" id="navLinks" aria-label="Principal">
       <a href="#nosotros">Nosotros</a>
+      <a href="#culto">En el culto</a>
       <a href="#oracion">Oración</a>
       <a href="#jovenes">Jóvenes</a>
       <a href="#mujeres">Mujeres</a>
@@ -64,11 +85,29 @@
       <div class="hero-photo" aria-hidden="true"></div>
       <canvas id="heroCanvas" aria-hidden="true"></canvas>
       <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+      <div class="rays" aria-hidden="true"></div>
       <div class="hero-inner">
+        <div class="hero-logo reveal"><svg class="logo logo-hero" viewBox="0 0 240 240" role="img" aria-label="Logo Iglesia Bautista Vida en Cristo">
+  <defs>
+    <path id="hl-ring" d="M54.95,185.05 A92,92 0 1,1 55.06,185.17"/>
+    <linearGradient id="hl-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe7b0"/><stop offset="1" stop-color="#e89b3c"/></linearGradient>
+    <clipPath id="hl-clip"><circle cx="120" cy="120" r="80"/></clipPath>
+  </defs>
+  <circle class="logo-halo" cx="120" cy="120" r="80"/>
+  <g class="logo-cross" fill="url(#hl-gold)"><rect x="110" y="38" width="20" height="124" rx="3"/><rect x="76" y="70" width="88" height="19" rx="3"/></g>
+  <g clip-path="url(#hl-clip)" fill="none" stroke-linecap="round">
+    <path class="logo-wave w1" d="M28 160 Q78 126 128 146 T214 140" stroke="#5fae6e" stroke-width="11"/>
+    <path class="logo-wave w2" d="M26 180 Q84 150 136 170 T214 164" stroke="#3d86c6" stroke-width="11"/>
+    <path class="logo-wave w3" d="M30 198 Q88 172 140 190 T214 186" stroke="#2a5f9a" stroke-width="7"/>
+  </g>
+  <text class="logo-ibvc" x="120" y="134" text-anchor="middle">IBVC</text>
+  <g class="logo-ring"><text><textPath href="#hl-ring" textLength="415" lengthAdjust="spacing">IGLESIA BAUTISTA VIDA EN CRISTO</textPath></text></g>
+  <g class="logo-branch"><path d="M172 206 C 196 182, 206 146, 200 104" fill="none"/><ellipse cx="177.6" cy="189.4" rx="6.5" ry="2.6" transform="rotate(-55 177.6 189.4)" style="--i:0"/><ellipse cx="182.4" cy="202.6" rx="6.5" ry="2.6" transform="rotate(15 182.4 202.6)" style="--i:0"/><ellipse cx="187.0" cy="178.3" rx="6.5" ry="2.6" transform="rotate(-70 187.0 178.3)" style="--i:1"/><ellipse cx="195.0" cy="189.7" rx="6.5" ry="2.6" transform="rotate(0 195.0 189.7)" style="--i:1"/><ellipse cx="192.6" cy="165.5" rx="6.5" ry="2.6" transform="rotate(-85 192.6 165.5)" style="--i:2"/><ellipse cx="203.4" cy="174.5" rx="6.5" ry="2.6" transform="rotate(-15 203.4 174.5)" style="--i:2"/><ellipse cx="196.7" cy="151.0" rx="6.5" ry="2.6" transform="rotate(-100 196.7 151.0)" style="--i:3"/><ellipse cx="209.3" cy="157.0" rx="6.5" ry="2.6" transform="rotate(-30 209.3 157.0)" style="--i:3"/><ellipse cx="197.1" cy="136.8" rx="6.5" ry="2.6" transform="rotate(-115 197.1 136.8)" style="--i:4"/><ellipse cx="210.9" cy="139.2" rx="6.5" ry="2.6" transform="rotate(-45 210.9 139.2)" style="--i:4"/><ellipse cx="196.0" cy="122.6" rx="6.5" ry="2.6" transform="rotate(-130 196.0 122.6)" style="--i:5"/><ellipse cx="210.0" cy="121.4" rx="6.5" ry="2.6" transform="rotate(-60 210.0 121.4)" style="--i:5"/><ellipse cx="194.4" cy="110.4" rx="6.5" ry="2.6" transform="rotate(-145 194.4 110.4)" style="--i:6"/><ellipse cx="207.6" cy="105.6" rx="6.5" ry="2.6" transform="rotate(-75 207.6 105.6)" style="--i:6"/></g>
+</svg></div>
         <p class="eyebrow reveal">Iglesia Bautista · Houston, Texas</p>
-        <h1 class="hero-title reveal">
-          <span class="line">Una vida</span>
-          <span class="line"><em>nueva</em> en Cristo</span>
+        <h1 class="hero-title">
+          <span class="line"><span class="word">Una</span> <span class="word">vida</span></span>
+          <span class="line"><em class="word">nueva</em> <span class="word">en</span> <span class="word">Cristo</span></span>
         </h1>
         <p class="hero-sub reveal">Somos una iglesia hispana con las puertas abiertas a todos. Aquí hay un lugar para ti y para tu familia.</p>
         <div class="hero-cta reveal">
@@ -93,6 +132,13 @@
       <a href="#versiculo" class="scroll-hint" aria-label="Bajar"><span></span></a>
     </section>
 
+    <div class="marquee" aria-hidden="true">
+      <div class="marquee-track">
+        <span>Fe</span><i>✦</i><span>Esperanza</span><i>✦</i><span>Amor</span><i>✦</i><span>Gracia</span><i>✦</i><span>Vida en Cristo</span><i>✦</i><span>Familia</span><i>✦</i><span>Adoración</span><i>✦</i>
+        <span>Fe</span><i>✦</i><span>Esperanza</span><i>✦</i><span>Amor</span><i>✦</i><span>Gracia</span><i>✦</i><span>Vida en Cristo</span><i>✦</i><span>Familia</span><i>✦</i><span>Adoración</span><i>✦</i>
+      </div>
+    </div>
+
     <!-- ============ VERSE OF THE DAY ============ -->
     <section class="verse-band" id="versiculo">
       <div class="container verse-wrap reveal">
@@ -111,12 +157,13 @@
       <div class="container about-grid">
         <div class="pastor-card tilt reveal">
           <div class="pastor-photo" id="pastorPhoto">
-            <img src="assets/img/pastor.jpg" alt="Pastor Liván Quintana y su esposa Zoila" onerror="this.remove()">
+            <img src="assets/img/predicacion.jpg" alt="El pastor Liván Quintana predicando" onerror="this.remove()">
             <div class="pastor-fallback" aria-hidden="true">LQ</div>
           </div>
+          <div class="pastor-quote">“Será de gran bendición tenerte. ¡No te pierdas nuestro servicio!”</div>
           <div class="pastor-meta">
             <h3>Pastor Liván Quintana</h3>
-            <p>y su esposa Zoila</p>
+            <p>Pastor principal</p>
           </div>
         </div>
         <div class="about-text">
@@ -143,6 +190,61 @@
         </div>
         <div class="schedule" id="schedule"></div>
         <p class="note reveal">Los horarios pueden cambiar en días festivos. Confírmalos en nuestro <a href="https://www.facebook.com/vidaencristotexas/" target="_blank" rel="noopener">Facebook</a>.</p>
+      </div>
+    </section>
+
+    <!-- ============ SERVICE MODE ============ -->
+    <section class="section culto" id="culto">
+      <div class="culto-bg" aria-hidden="true"></div>
+      <div class="container">
+        <div class="section-head reveal">
+          <p class="eyebrow">Modo Culto</p>
+          <h2>Vive el servicio <em>desde tu asiento</em></h2>
+          <p class="lead">Abre esta página durante el culto: sigue el orden del servicio en vivo, completa el bosquejo del sermón y guarda tus notas.</p>
+        </div>
+        <div class="culto-status glass reveal" id="cultoStatus"></div>
+
+        <div class="culto-grid">
+          <article class="c-card c-silence reveal">
+            <div class="bell" aria-hidden="true">
+              <svg viewBox="0 0 64 64"><path class="bell-body" d="M32 8c-9 0-16 7-16 16v10l-5 8h42l-5-8V24c0-9-7-16-16-16z"/><path class="bell-clap" d="M26 46a6 6 0 0 0 12 0"/><path class="bell-slash" d="M10 10 L54 54"/></svg>
+            </div>
+            <h3>Silencio sagrado</h3>
+            <p>Al comenzar el culto te pediremos que pongas tu teléfono en silencio para que nada te distraiga de la presencia de Dios.</p>
+            <div class="row">
+              <button class="btn btn-gold btn-sm" id="silenceEnable">🔔 Activar aviso</button>
+              <button class="btn btn-ghost btn-sm" id="silenceTest">Ver cómo se ve</button>
+            </div>
+            <p class="small" id="silenceInfo">Tu navegador no puede silenciar el teléfono por sí solo; te recordaremos hacerlo con un aviso y vibración.</p>
+          </article>
+
+          <article class="c-card c-order reveal">
+            <h3>Orden del culto</h3>
+            <ol class="order" id="serviceOrder"></ol>
+          </article>
+
+          <article class="c-card c-sermon reveal">
+            <div class="sermon-head">
+              <span class="badge-gold" id="sermonTag">Sermón de hoy</span>
+              <h3 id="sermonTitle">…</h3>
+              <p class="sermon-passage" id="sermonPassage"></p>
+            </div>
+            <ol class="points" id="sermonPoints"></ol>
+            <button class="btn btn-gold" id="sermonOpen">
+              <svg viewBox="0 0 24 24"><path d="M3 4h18v12H3zM8 20h8M12 16v4"/></svg>
+              Modo Predicación
+            </button>
+          </article>
+
+          <article class="c-card c-notes reveal">
+            <h3>Mis notas</h3>
+            <textarea id="notesArea" rows="8" placeholder="Lo que Dios me habla hoy…"></textarea>
+            <div class="row">
+              <span class="small" id="notesSaved">Se guardan solo en tu teléfono</span>
+              <button class="chip" id="notesShare">Compartir</button>
+            </div>
+          </article>
+        </div>
       </div>
     </section>
 
@@ -301,6 +403,17 @@
             </figcaption>
           </figure>
           <!-- Quiz -->
+          <article class="tile tile-live reveal">
+            <div>
+              <span class="badge">En vivo · Para el proyector</span>
+              <h3>Dinámicas para la reunión</h3>
+              <p class="small">Proyecta la pantalla y jueguen todos juntos.</p>
+            </div>
+            <div class="live-btns">
+              <button class="live-btn" id="openTrivia"><span>🏆</span><b>Trivia por equipos</b><small>Fuego vs Luz · 20 segundos por pregunta</small></button>
+              <button class="live-btn" id="openWheel"><span>🎡</span><b>Ruleta de retos</b><small>Gira y descubre quién va</small></button>
+            </div>
+          </article>
           <article class="tile tile-quiz reveal" id="quizTile">
             <header class="tile-head">
               <span class="badge">Reto bíblico</span>
@@ -439,7 +552,8 @@
           </ul>
           <div class="visit-cta reveal">
             <a class="btn btn-gold" id="mapsLink" target="_blank" rel="noopener">Cómo llegar</a>
-            <a class="btn btn-ghost" href="https://www.facebook.com/vidaencristotexas/" target="_blank" rel="noopener">Escríbenos en Facebook</a>
+            <a class="btn btn-ghost" href="https://www.facebook.com/vidaencristotexas/" target="_blank" rel="noopener">Facebook</a>
+            <a class="btn btn-ghost" href="https://www.instagram.com/iglesiavidaen_cristo/" target="_blank" rel="noopener">Instagram</a>
           </div>
         </div>
         <div class="map glass reveal">
@@ -449,10 +563,30 @@
     </section>
   </main>
 
+  <div class="waves" aria-hidden="true">
+    <svg viewBox="0 0 1440 120" preserveAspectRatio="none"><path class="wv wv1" d="M0 60 Q180 20 360 60 T720 60 T1080 60 T1440 60 T1800 60 T2160 60 T2520 60 T2880 60 V120 H0z"/><path class="wv wv2" d="M0 80 Q180 40 360 80 T720 80 T1080 80 T1440 80 T1800 80 T2160 80 T2520 80 T2880 80 V120 H0z"/><path class="wv wv3" d="M0 95 Q180 70 360 95 T720 95 T1080 95 T1440 95 T1800 95 T2160 95 T2520 95 T2880 95 V120 H0z"/></svg>
+  </div>
   <footer class="footer">
     <div class="container footer-grid">
       <div>
-        <a href="#inicio" class="brand"><span class="brand-mark"><svg viewBox="0 0 32 32"><path d="M14 4h4v9h9v4h-9v11h-4V17H5v-4h9z"/></svg></span><span class="brand-text">Vida en Cristo<small>Iglesia Bautista · Texas</small></span></a>
+        <a href="#inicio" class="brand"><span class="brand-mark"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="mf-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe7b0"/><stop offset="1" stop-color="#e89b3c"/></linearGradient><clipPath id="mf-c"><circle cx="32" cy="32" r="30"/></clipPath></defs><circle cx="32" cy="32" r="30" fill="#0e1630"/><g clip-path="url(#mf-c)"><rect x="28" y="9" width="8" height="40" rx="1.5" fill="url(#mf-g)"/><rect x="17" y="19" width="30" height="7" rx="1.5" fill="url(#mf-g)"/><path d="M2 44 Q18 34 32 40 T64 38" stroke="#5fae6e" stroke-width="5" fill="none"/><path d="M2 52 Q20 42 34 48 T64 47" stroke="#3d86c6" stroke-width="5" fill="none"/></g><circle cx="32" cy="32" r="30" fill="none" stroke="url(#mf-g)" stroke-width="1.5"/></svg></span><span class="brand-text">Vida en Cristo<small>Iglesia Bautista · Texas</small></span></a>
+        <div class="footer-logo"><svg class="logo logo-foot" viewBox="0 0 240 240" role="img" aria-label="Logo Iglesia Bautista Vida en Cristo">
+  <defs>
+    <path id="fl-ring" d="M54.95,185.05 A92,92 0 1,1 55.06,185.17"/>
+    <linearGradient id="fl-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe7b0"/><stop offset="1" stop-color="#e89b3c"/></linearGradient>
+    <clipPath id="fl-clip"><circle cx="120" cy="120" r="80"/></clipPath>
+  </defs>
+  <circle class="logo-halo" cx="120" cy="120" r="80"/>
+  <g class="logo-cross" fill="url(#fl-gold)"><rect x="110" y="38" width="20" height="124" rx="3"/><rect x="76" y="70" width="88" height="19" rx="3"/></g>
+  <g clip-path="url(#fl-clip)" fill="none" stroke-linecap="round">
+    <path class="logo-wave w1" d="M28 160 Q78 126 128 146 T214 140" stroke="#5fae6e" stroke-width="11"/>
+    <path class="logo-wave w2" d="M26 180 Q84 150 136 170 T214 164" stroke="#3d86c6" stroke-width="11"/>
+    <path class="logo-wave w3" d="M30 198 Q88 172 140 190 T214 186" stroke="#2a5f9a" stroke-width="7"/>
+  </g>
+  <text class="logo-ibvc" x="120" y="134" text-anchor="middle">IBVC</text>
+  <g class="logo-ring"><text><textPath href="#fl-ring" textLength="415" lengthAdjust="spacing">IGLESIA BAUTISTA VIDA EN CRISTO</textPath></text></g>
+  <g class="logo-branch"><path d="M172 206 C 196 182, 206 146, 200 104" fill="none"/><ellipse cx="177.6" cy="189.4" rx="6.5" ry="2.6" transform="rotate(-55 177.6 189.4)" style="--i:0"/><ellipse cx="182.4" cy="202.6" rx="6.5" ry="2.6" transform="rotate(15 182.4 202.6)" style="--i:0"/><ellipse cx="187.0" cy="178.3" rx="6.5" ry="2.6" transform="rotate(-70 187.0 178.3)" style="--i:1"/><ellipse cx="195.0" cy="189.7" rx="6.5" ry="2.6" transform="rotate(0 195.0 189.7)" style="--i:1"/><ellipse cx="192.6" cy="165.5" rx="6.5" ry="2.6" transform="rotate(-85 192.6 165.5)" style="--i:2"/><ellipse cx="203.4" cy="174.5" rx="6.5" ry="2.6" transform="rotate(-15 203.4 174.5)" style="--i:2"/><ellipse cx="196.7" cy="151.0" rx="6.5" ry="2.6" transform="rotate(-100 196.7 151.0)" style="--i:3"/><ellipse cx="209.3" cy="157.0" rx="6.5" ry="2.6" transform="rotate(-30 209.3 157.0)" style="--i:3"/><ellipse cx="197.1" cy="136.8" rx="6.5" ry="2.6" transform="rotate(-115 197.1 136.8)" style="--i:4"/><ellipse cx="210.9" cy="139.2" rx="6.5" ry="2.6" transform="rotate(-45 210.9 139.2)" style="--i:4"/><ellipse cx="196.0" cy="122.6" rx="6.5" ry="2.6" transform="rotate(-130 196.0 122.6)" style="--i:5"/><ellipse cx="210.0" cy="121.4" rx="6.5" ry="2.6" transform="rotate(-60 210.0 121.4)" style="--i:5"/><ellipse cx="194.4" cy="110.4" rx="6.5" ry="2.6" transform="rotate(-145 194.4 110.4)" style="--i:6"/><ellipse cx="207.6" cy="105.6" rx="6.5" ry="2.6" transform="rotate(-75 207.6 105.6)" style="--i:6"/></g>
+</svg></div>
         <p class="footer-verse">“Yo he venido para que tengan vida, y para que la tengan en abundancia.” — Juan 10:10</p>
       </div>
       <div>
@@ -462,12 +596,65 @@
       <div>
         <h4>Conecta</h4>
         <a href="https://www.facebook.com/vidaencristotexas/" target="_blank" rel="noopener">Facebook</a>
+        <a href="https://www.instagram.com/iglesiavidaen_cristo/" target="_blank" rel="noopener">Instagram</a>
         <a href="#visitanos">Visítanos</a>
       </div>
     </div>
     <p class="copyright">© <span id="year"></span> Iglesia Bautista Vida en Cristo · Pastor Liván Quintana · 18131 Nassau Bay Dr, Houston, TX 77058</p>
   </footer>
 
+  <!-- ============ OVERLAYS ============ -->
+  <div class="overlay silence-ov" id="silenceOv" hidden role="dialog" aria-modal="true" aria-labelledby="silTitle">
+    <div class="sil-inner">
+      <div class="phone" aria-hidden="true">
+        <svg viewBox="0 0 120 200"><rect x="10" y="6" width="100" height="188" rx="18"/><rect x="44" y="16" width="32" height="6" rx="3" class="notch"/><g class="ph-bell"><path d="M60 70c-11 0-19 8-19 19v12l-6 10h50l-6-10V89c0-11-8-19-19-19z"/><path d="M53 116a7 7 0 0 0 14 0"/></g><path class="ph-slash" d="M32 62 L88 130"/></svg>
+      </div>
+      <p class="eyebrow">El culto está comenzando</p>
+      <h2 id="silTitle">Silencia tu teléfono 🔕</h2>
+      <p class="sil-verse">“Estad quietos, y conoced que yo soy Dios.” — Salmo 46:10</p>
+      <button class="btn btn-gold" id="silenceDone">Listo, ya lo silencié</button>
+    </div>
+  </div>
+
+  <div class="overlay sermon-ov" id="sermonOv" hidden role="dialog" aria-modal="true" aria-label="Modo Predicación">
+    <div class="sm-ambient" aria-hidden="true"><i></i><i></i><i></i></div>
+    <canvas class="sm-canvas" id="smCanvas" aria-hidden="true"></canvas>
+    <header class="sm-top">
+      <div class="sm-brand"><span class="brand-mark"><svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><defs><linearGradient id="ms-g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe7b0"/><stop offset="1" stop-color="#e89b3c"/></linearGradient><clipPath id="ms-c"><circle cx="32" cy="32" r="30"/></clipPath></defs><circle cx="32" cy="32" r="30" fill="#0e1630"/><g clip-path="url(#ms-c)"><rect x="28" y="9" width="8" height="40" rx="1.5" fill="url(#ms-g)"/><rect x="17" y="19" width="30" height="7" rx="1.5" fill="url(#ms-g)"/><path d="M2 44 Q18 34 32 40 T64 38" stroke="#5fae6e" stroke-width="5" fill="none"/><path d="M2 52 Q20 42 34 48 T64 47" stroke="#3d86c6" stroke-width="5" fill="none"/></g><circle cx="32" cy="32" r="30" fill="none" stroke="url(#ms-g)" stroke-width="1.5"/></svg></span><div><b id="smTitle"></b><small id="smPassage"></small></div></div>
+      <div class="sm-timer" title="Tiempo de predicación"><span class="live-dot"></span><span id="smClock">00:00</span></div>
+      <button class="icon-btn" id="smClose" aria-label="Cerrar">✕</button>
+    </header>
+    <main class="sm-stage" id="smStage" aria-live="polite"></main>
+    <footer class="sm-bottom">
+      <button class="btn btn-ghost btn-sm" id="smPrev">← Anterior</button>
+      <div class="sm-dots" id="smDots"></div>
+      <button class="btn btn-gold btn-sm" id="smNext">Siguiente →</button>
+    </footer>
+  </div>
+
+  <div class="overlay game-ov" id="triviaOv" hidden role="dialog" aria-modal="true" aria-label="Trivia por equipos">
+    <button class="icon-btn ov-close" data-close aria-label="Cerrar">✕</button>
+    <div class="game" id="trivia"></div>
+  </div>
+
+  <div class="overlay game-ov" id="wheelOv" hidden role="dialog" aria-modal="true" aria-label="Ruleta de retos">
+    <button class="icon-btn ov-close" data-close aria-label="Cerrar">✕</button>
+    <div class="wheel-wrap">
+      <div class="wheel-stage">
+        <div class="wheel-pin" aria-hidden="true"></div>
+        <canvas id="wheelCanvas" width="560" height="560"></canvas>
+        <button class="wheel-spin" id="wheelSpin">GIRAR</button>
+      </div>
+      <div class="wheel-side">
+        <h3>Ruleta de retos</h3>
+        <p class="small">Una opción por línea: nombres de los jóvenes o retos.</p>
+        <textarea id="wheelItems" rows="9"></textarea>
+        <div class="wheel-result" id="wheelResult" aria-live="polite"></div>
+      </div>
+    </div>
+  </div>
+
+  <canvas class="confetti" id="confetti" aria-hidden="true"></canvas>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script src="assets/js/config.js"></script>

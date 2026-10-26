@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" class="logo" viewBox="0 0 240 240" role="img" aria-label="Logo Iglesia Bautista Vida en Cristo">
+  <defs>
+    <path id="lg-ring" d="M54.95,185.05 A92,92 0 1,1 55.06,185.17"/>
+    <linearGradient id="lg-gold" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe7b0"/><stop offset="1" stop-color="#e89b3c"/></linearGradient>
+    <clipPath id="lg-clip"><circle cx="120" cy="120" r="80"/></clipPath>
+  </defs>
+  <circle class="logo-halo" cx="120" cy="120" r="80"/>
+  <g class="logo-cross" fill="url(#lg-gold)"><rect x="110" y="38" width="20" height="124" rx="3"/><rect x="76" y="70" width="88" height="19" rx="3"/></g>
+  <g clip-path="url(#lg-clip)" fill="none" stroke-linecap="round">
+    <path class="logo-wave w1" d="M28 160 Q78 126 128 146 T214 140" stroke="#5fae6e" stroke-width="11"/>
+    <path class="logo-wave w2" d="M26 180 Q84 150 136 170 T214 164" stroke="#3d86c6" stroke-width="11"/>
+    <path class="logo-wave w3" d="M30 198 Q88 172 140 190 T214 186" stroke="#2a5f9a" stroke-width="7"/>
+  </g>
+  <text class="logo-ibvc" font-family="Georgia, serif" font-size="46" fill="#fff" x="120" y="134" text-anchor="middle">IBVC</text>
+  <g class="logo-ring"><text font-family="Georgia, serif" font-size="14" fill="#fff" letter-spacing="2"><textPath href="#lg-ring" textLength="415" lengthAdjust="spacing">IGLESIA BAUTISTA VIDA EN CRISTO</textPath></text></g>
+  <g class="logo-branch" fill="none" stroke="#fff" stroke-width="1.4"><path d="M172 206 C 196 182, 206 146, 200 104" fill="none"/><ellipse cx="177.6" cy="189.4" rx="6.5" ry="2.6" transform="rotate(-55 177.6 189.4)" style="--i:0"/><ellipse cx="182.4" cy="202.6" rx="6.5" ry="2.6" transform="rotate(15 182.4 202.6)" style="--i:0"/><ellipse cx="187.0" cy="178.3" rx="6.5" ry="2.6" transform="rotate(-70 187.0 178.3)" style="--i:1"/><ellipse cx="195.0" cy="189.7" rx="6.5" ry="2.6" transform="rotate(0 195.0 189.7)" style="--i:1"/><ellipse cx="192.6" cy="165.5" rx="6.5" ry="2.6" transform="rotate(-85 192.6 165.5)" style="--i:2"/><ellipse cx="203.4" cy="174.5" rx="6.5" ry="2.6" transform="rotate(-15 203.4 174.5)" style="--i:2"/><ellipse cx="196.7" cy="151.0" rx="6.5" ry="2.6" transform="rotate(-100 196.7 151.0)" style="--i:3"/><ellipse cx="209.3" cy="157.0" rx="6.5" ry="2.6" transform="rotate(-30 209.3 157.0)" style="--i:3"/><ellipse cx="197.1" cy="136.8" rx="6.5" ry="2.6" transform="rotate(-115 197.1 136.8)" style="--i:4"/><ellipse cx="210.9" cy="139.2" rx="6.5" ry="2.6" transform="rotate(-45 210.9 139.2)" style="--i:4"/><ellipse cx="196.0" cy="122.6" rx="6.5" ry="2.6" transform="rotate(-130 196.0 122.6)" style="--i:5"/><ellipse cx="210.0" cy="121.4" rx="6.5" ry="2.6" transform="rotate(-60 210.0 121.4)" style="--i:5"/><ellipse cx="194.4" cy="110.4" rx="6.5" ry="2.6" transform="rotate(-145 194.4 110.4)" style="--i:6"/><ellipse cx="207.6" cy="105.6" rx="6.5" ry="2.6" transform="rotate(-75 207.6 105.6)" style="--i:6"/></g>
+</svg>

@@ -53,6 +53,18 @@ Las fotos se descargan en `assets/img/fb/` junto con `gallery.json`, y la galer�
 
 ## Funciones
 
+### Modo Culto (para usar dentro de la iglesia)
+- **Silencio sagrado:** al comenzar el culto (primeros 20 minutos), quien tenga la página abierta ve un aviso a pantalla completa para silenciar el teléfono, con vibración y notificación si la activó. Ningún navegador puede silenciar el teléfono por sí solo; esto es un recordatorio.
+- **Orden del culto en vivo:** se marca qué parte del servicio está ocurriendo (`serviceOrder` en `config.js`).
+- **Bosquejo del sermón:** espacios en blanco que se tocan para revelar la palabra (`sermon` en `config.js`; escribe las palabras ocultas entre `[corchetes]`).
+- **Modo Predicación:** pantalla completa para el proyector o el teléfono, con cronómetro, efectos y la pantalla siempre encendida. Se maneja con las flechas del teclado o un presentador.
+- **Mis notas:** se guardan en el teléfono y se pueden compartir.
+
+### Jóvenes en vivo
+- **Trivia por equipos** para proyectar: 10 preguntas, 20 segundos cada una, marcador y confeti al final.
+- **Ruleta de retos:** se edita con nombres o retos y se guarda en el navegador.
+
+
 - **Sala de Oración** con 3 niveles de privacidad:
   - 🕊️ **Muro anónimo**: la iglesia ora con un toque ("Estoy orando" enciende una vela). El autor puede marcarla como **respondida** y añadir un testimonio.
   - 🔒 **Solo el pastor**: confidencial, nunca se publica.
