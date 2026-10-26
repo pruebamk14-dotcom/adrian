@@ -687,7 +687,7 @@
      Gallery + Facebook live feed + map
      ========================================================= */
   const gal = $("#gallery");
-  gal.replaceChildren(...(C.gallery || []).map(g => {
+  const renderGallery = (items) => gal.replaceChildren(...items.slice(0, 12).map(g => {
     const fig = el("figure", { class: "g", style: "margin:0" });
     const ph = el("div", { class: "ph" });
     ph.innerHTML = '<div><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 17-5-5-8 8"/></svg>Foto: ' + g.caption.replace(/[<>&]/g, "") + "</div>";
@@ -704,6 +704,11 @@
     });
     return fig;
   }));
+  renderGallery(C.gallery || []);
+  // Fotos descargadas de Facebook con tools/facebook-fotos.mjs (si existen, reemplazan las de config.js)
+  fetch("assets/img/fb/gallery.json").then(r => r.ok ? r.json() : null).then(list => {
+    if (Array.isArray(list) && list.length) renderGallery(list);
+  }).catch(() => {});
 
   const fbFrame = $("#fbFrame");
   new IntersectionObserver(([e], obs) => {

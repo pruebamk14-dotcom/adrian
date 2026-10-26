@@ -36,6 +36,21 @@ Descarga las fotos del Facebook de la iglesia y guárdalas en `assets/img/`:
 
 Mientras no estén, el sitio muestra marcadores elegantes. La sección "En vivo" incrusta la página de Facebook oficial, así que las publicaciones, fotos y videos reales aparecen solos.
 
+### Fotos automáticas de Facebook
+
+Facebook no permite que otras webs lean `facebook.com/vidaencristotexas/photos` directamente. La vía oficial es su API, con un token de un **administrador de la página**:
+
+1. Quien administra la página entra a <https://developers.facebook.com/tools/explorer/> con su cuenta.
+2. Crea o elige una app. En "Usuario o página" selecciona **la página Vida en Cristo** y agrega los permisos `pages_show_list` y `pages_read_engagement`.
+3. Pulsa **Generate Access Token** y copia el token.
+4. Desde la carpeta `vidaencristo/` ejecuta (Node 18 o superior):
+
+   ```bash
+   FB_TOKEN="pega-el-token-aquí" node tools/facebook-fotos.mjs vidaencristotexas 24
+   ```
+
+Las fotos se descargan en `assets/img/fb/` junto con `gallery.json`, y la galería del sitio las muestra sola (hasta 12). Para actualizarlas, vuelve a ejecutar el script y sube la carpeta otra vez. El token no se guarda en ningún archivo: no lo pegues en el código ni lo compartas.
+
 ## Funciones
 
 - **Sala de Oración** con 3 niveles de privacidad:
