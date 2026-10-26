@@ -1,0 +1,14 @@
+# Web de la Iglesia Bautista Vida en Cristo en Render (gratis).
+# En Render: New → Blueprint → elige el repo "adrian". Render lee este archivo y la publica solo.
+# Cada cambio que se suba a "main" se vuelve a publicar automáticamente.
+services:
+  - type: web
+    name: vida-en-cristo
+    runtime: static
+    buildCommand: echo "Sitio estático, no hace falta compilar"
+    staticPublishPath: ./vidaencristo
+    pullRequestPreviewsEnabled: false
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
