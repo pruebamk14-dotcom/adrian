@@ -53,6 +53,31 @@ window.CHURCH = {
     { src: "assets/img/jovenes-grupo2.jpg", caption: "Jóvenes en equipo" }
   ],
 
+  /* ---------- MODO CULTO ----------
+     Cambiar cada semana. Los espacios en blanco del bosquejo se escriben
+     entre [corchetes]: la persona los toca para revelar la palabra. */
+  sermon: {
+    example: true,   // poner en false cuando se cargue el sermón real
+    title: "Una vida nueva en Cristo",
+    passage: "2 Corintios 5:17",
+    points: [
+      { title: "Somos [nuevas criaturas]", text: "En Cristo no somos una versión mejorada de lo que éramos: somos una creación nueva.", verse: "“De modo que si alguno está en Cristo, nueva criatura es…” — 2 Corintios 5:17" },
+      { title: "Lo viejo [pasó]", text: "La culpa, el pasado y las cadenas ya no definen quién eres.", verse: "“Ahora, pues, ninguna condenación hay para los que están en Cristo Jesús.” — Romanos 8:1" },
+      { title: "Todo es hecho [nuevo]", text: "Dios renueva tu mente, tu familia y tu propósito día a día.", verse: "“Transformaos por medio de la renovación de vuestro entendimiento.” — Romanos 12:2" },
+      { title: "Vivimos para [servir]", text: "Una vida nueva se nota en cómo amamos y servimos a los demás.", verse: "“Porque somos hechura suya, creados en Cristo Jesús para buenas obras.” — Efesios 2:10" }
+    ]
+  },
+
+  // Orden del culto dominical: minutos desde el inicio.
+  serviceOrder: [
+    { at: 0,  title: "Bienvenida",  icon: "👋" },
+    { at: 5,  title: "Alabanza",    icon: "🎶" },
+    { at: 30, title: "Oración",     icon: "🙏" },
+    { at: 40, title: "Ofrenda",     icon: "💛" },
+    { at: 45, title: "Predicación", icon: "📖" },
+    { at: 90, title: "Bendición",   icon: "✨" }
+  ],
+
   /* Conexión con un servidor para que las peticiones lleguen al pastor y
      el muro se comparta entre todos los visitantes. Si se deja en null,
      todo se guarda solo en el navegador de cada persona (modo demostración).

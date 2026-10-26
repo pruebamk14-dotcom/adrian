@@ -735,4 +735,314 @@
   $("#mapsLink").href = `https://www.google.com/maps/dir/?api=1&destination=${q}`;
 
   $("#year").textContent = new Date().getFullYear();
+
+  /* =========================================================
+     v2 — preloader, progress, split headings
+     ========================================================= */
+  const pre = $("#preloader");
+  const hidePre = () => pre && pre.classList.add("done");
+  if (reduced) hidePre();
+  else { const t0 = performance.now(); addEventListener("load", () => setTimeout(hidePre, Math.max(0, 1100 - (performance.now() - t0)))); setTimeout(hidePre, 2600); }
+
+  const bar = $("#scrollBar");
+  const onProg = () => { const h = document.documentElement.scrollHeight - innerHeight; bar.style.transform = `scaleX(${h > 0 ? scrollY / h : 0})`; };
+  addEventListener("scroll", onProg, { passive: true }); onProg();
+
+  const splitObs = new IntersectionObserver((es) => es.forEach(e => { if (e.isIntersecting) { e.target.classList.add("in"); splitObs.unobserve(e.target); } }), { threshold: .3 });
+  $$(".section-head h2, .about-text h2, .women-intro h2, .visit h2").forEach(h => {
+    let i = 0;
+    const wrap = (node) => {
+      [...node.childNodes].forEach(n => {
+        if (n.nodeType === 3) {
+          const frag = document.createDocumentFragment();
+          n.textContent.split(/(\s+)/).forEach(part => {
+            if (!part) return;
+            if (/^\s+$/.test(part)) frag.append(part);
+            else { const w = el("span", { class: "w", text: part }); w.style.setProperty("--d", i++); frag.append(w); }
+          });
+          n.replaceWith(frag);
+        } else if (n.nodeType === 1) wrap(n);
+      });
+    };
+    wrap(h); h.classList.remove("reveal"); h.classList.add("split"); splitObs.observe(h);
+  });
+
+  /* =========================================================
+     Confetti + overlays
+     ========================================================= */
+  const confetti = (() => {
+    const cv = $("#confetti"), ctx = cv.getContext("2d"); let parts = [], raf = 0;
+    const colors = ["#f5c46b", "#e89b3c", "#5fae6e", "#3d86c6", "#ff5e8a", "#7c5cff", "#2de2e6", "#fff"];
+    const loop = () => {
+      ctx.clearRect(0, 0, cv.width, cv.height);
+      parts = parts.filter(p => p.y < cv.height + 20 && p.life-- > 0);
+      for (const p of parts) {
+        p.vy += .25; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.r += p.vr;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.r); ctx.fillStyle = p.c; ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); ctx.restore();
+      }
+      raf = parts.length ? requestAnimationFrame(loop) : 0;
+    };
+    return (n = 160) => {
+      if (reduced) return;
+      cv.width = innerWidth; cv.height = innerHeight;
+      for (let i = 0; i < n; i++) parts.push({ x: innerWidth / 2 + (Math.random() - .5) * 200, y: innerHeight * .45, vx: (Math.random() - .5) * 22, vy: -Math.random() * 18 - 6, r: Math.random() * 6, vr: (Math.random() - .5) * .3, w: 6 + Math.random() * 6, h: 10 + Math.random() * 8, c: colors[i % colors.length], life: 260 });
+      if (!raf) raf = requestAnimationFrame(loop);
+    };
+  })();
+
+  const openOv = (ov) => { ov.hidden = false; document.body.classList.add("locked"); };
+  const closeOv = (ov) => { ov.hidden = true; if (!$$(".overlay:not([hidden])").length) document.body.classList.remove("locked"); ov.dispatchEvent(new Event("close")); };
+  $$(".overlay [data-close]").forEach(b => b.addEventListener("click", () => closeOv(b.closest(".overlay"))));
+  addEventListener("keydown", (e) => { if (e.key === "Escape") { const ov = $$(".overlay:not([hidden])").pop(); if (ov && ov.id !== "silenceOv") closeOv(ov); } });
+
+  /* =========================================================
+     Service mode (Modo Culto)
+     ========================================================= */
+  const MAIN = services.find(s => !s.nth && !s.group) || services[0];
+  const ORDER = C.serviceOrder || [];
+  const SERVICE_MIN = Math.max(90, (ORDER[ORDER.length - 1]?.at || 90) + 20);
+  const serviceState = () => {
+    const now = nowInTz(); if (!MAIN) return null;
+    const [h, m] = MAIN.time.split(":").map(Number);
+    const today = new Date(now); today.setHours(h, m, 0, 0);
+    if (matches(MAIN, today) && now >= today && now - today < SERVICE_MIN * 6e4) return { live: true, start: today, elapsed: (now - today) / 6e4, now };
+    return { live: false, start: occurrences(MAIN, now)[0], now };
+  };
+  const hhmm = (d) => d.toLocaleTimeString("es-US", { hour: "numeric", minute: "2-digit" });
+
+  const orderList = $("#serviceOrder");
+  const renderOrder = (st) => {
+    const start = st.start;
+    const cur = st.live ? ORDER.reduce((k, it, i) => st.elapsed >= it.at ? i : k, 0) : -1;
+    orderList.replaceChildren(el("span", { class: "bar" }), ...ORDER.map((it, i) => {
+      const t = new Date(start.getTime() + it.at * 6e4);
+      return el("li", { class: i < cur ? "done" : i === cur ? "now" : "" }, el("span", { class: "ico", text: it.icon }), el("b", { text: it.title }), el("small", { text: hhmm(t) }));
+    }));
+    requestAnimationFrame(() => {
+      const nowLi = $("li.now", orderList), b = $(".bar", orderList);
+      if (nowLi) b.style.height = (nowLi.offsetTop + nowLi.offsetHeight / 2 - 10) + "px";
+    });
+  };
+
+  const silenceKey = (st) => "silenced_" + st.start.toDateString();
+  const showSilence = () => { openOv($("#silenceOv")); try { navigator.vibrate?.([250, 120, 250, 120, 400]); } catch {} };
+  $("#silenceDone").addEventListener("click", () => {
+    const st = serviceState(); if (st?.live) store.set(silenceKey(st), true);
+    closeOv($("#silenceOv")); confetti(80); toast("🙏 ¡Gracias! Que disfrutes la presencia de Dios.");
+  });
+  $("#silenceTest").addEventListener("click", showSilence);
+  const silenceBtn = $("#silenceEnable");
+  const syncSilenceBtn = () => { if (store.get("silenceOn", false)) { silenceBtn.textContent = "✅ Aviso activado"; } };
+  syncSilenceBtn();
+  silenceBtn.addEventListener("click", async () => {
+    store.set("silenceOn", true); syncSilenceBtn();
+    try { if ("Notification" in window && Notification.permission === "default") await Notification.requestPermission(); } catch {}
+    toast("🔔 Te avisaremos al comenzar el culto si tienes esta página abierta. También puedes agregar el culto a tu calendario.");
+  });
+
+  let notified = false;
+  const tickService = () => {
+    const st = serviceState(); if (!st || !st.start) return;
+    const box = $("#cultoStatus");
+    box.classList.toggle("live", st.live);
+    if (st.live) {
+      const cur = ORDER.reduce((k, it) => st.elapsed >= it.at ? it : k, ORDER[0]);
+      box.replaceChildren(el("span", { class: "live-dot" }), el("span", { text: `El culto está en vivo · Ahora: ${cur ? cur.icon + " " + cur.title : ""}` }));
+      if (st.elapsed < 20 && !store.get(silenceKey(st), false) && $("#silenceOv").hidden) {
+        showSilence();
+        if (!notified && store.get("silenceOn", false) && "Notification" in window && Notification.permission === "granted") {
+          notified = true; try { new Notification("Vida en Cristo", { body: "El culto está comenzando. Silencia tu teléfono 🔕", icon: "assets/img/mark.svg" }); } catch {}
+        }
+      }
+    } else {
+      box.replaceChildren(el("span", { class: "live-dot" }), el("span", { text: `Próximo culto: ${st.start.toLocaleDateString("es-US", { weekday: "long", day: "numeric", month: "long" })} · ${hhmm(st.start)}` }));
+    }
+    renderOrder(st);
+  };
+  tickService(); setInterval(tickService, 20000);
+
+  /* sermon outline */
+  const SER = C.sermon || { title: "", passage: "", points: [] };
+  const today8 = new Date().toISOString().slice(0, 10);
+  $("#sermonTag").textContent = SER.example ? "Bosquejo de ejemplo" : "Sermón de hoy";
+  $("#sermonTitle").textContent = SER.title;
+  $("#sermonPassage").textContent = SER.passage;
+  const revealed = new Set(store.get("blanks_" + today8, []));
+  const withBlanks = (txt, key) => {
+    const frag = document.createDocumentFragment();
+    txt.split(/(\[[^\]]+\])/).forEach((part, j) => {
+      const mm = part.match(/^\[(.+)\]$/);
+      if (!mm) { frag.append(part); return; }
+      const id = key + ":" + j;
+      const b = el("button", { class: "blank" + (revealed.has(id) ? " on" : ""), text: mm[1], "aria-label": revealed.has(id) ? mm[1] : "Revelar palabra" });
+      b.addEventListener("click", (e) => {
+        if (b.classList.contains("on")) return;
+        b.classList.add("on"); b.setAttribute("aria-label", mm[1]); revealed.add(id); store.set("blanks_" + today8, [...revealed]);
+        sparks(e.clientX, e.clientY);
+        if ($$("#sermonPoints .blank").every(x => x.classList.contains("on"))) { confetti(90); toast("📖 ¡Completaste el bosquejo!"); }
+      });
+      frag.append(b);
+    });
+    return frag;
+  };
+  $("#sermonPoints").replaceChildren(...SER.points.map((pt, i) => el("li", {}, el("span", {}, withBlanks(pt.title, "p" + i)))));
+
+  /* notes */
+  const notesKey = "notes_" + today8, notes = $("#notesArea");
+  notes.value = store.get(notesKey, "");
+  let nt; notes.addEventListener("input", () => { clearTimeout(nt); nt = setTimeout(() => { store.set(notesKey, notes.value); $("#notesSaved").textContent = "✓ Guardado en tu teléfono"; }, 400); });
+  $("#notesShare").addEventListener("click", async () => {
+    const text = `${SER.title} (${SER.passage})\n\n${notes.value}\n\n— Iglesia Bautista Vida en Cristo`;
+    try { if (navigator.share) await navigator.share({ text }); else { await navigator.clipboard.writeText(text); toast("📋 Notas copiadas"); } } catch {}
+  });
+
+  /* preaching mode */
+  const smOv = $("#sermonOv"), stage = $("#smStage");
+  const slides = [
+    { kind: "intro" },
+    ...SER.points.map((p, i) => ({ kind: "point", i, ...p })),
+    { kind: "end" }
+  ];
+  let si = 0, smT0 = 0, smTimer = 0, wake = null, smAnim = 0;
+  const fmtClock = (ms) => { const t = Math.floor(ms / 1000), h = Math.floor(t / 3600), m = Math.floor(t % 3600 / 60), s2 = t % 60; return (h ? h + ":" : "") + String(m).padStart(2, "0") + ":" + String(s2).padStart(2, "0"); };
+  const renderSlide = () => {
+    const sl = slides[si];
+    let node;
+    if (sl.kind === "intro") node = el("div", { class: "sm-slide" }, el("p", { class: "eyebrow", text: "Predicación" }), el("h2", { text: SER.title }), el("p", { class: "sm-verse", text: SER.passage }));
+    else if (sl.kind === "end") node = el("div", { class: "sm-slide" }, el("div", { class: "sm-num", text: "✦" }), el("h2", { text: "Amén" }), el("p", { text: "Lleva esta Palabra contigo esta semana. Dios te bendiga." }));
+    else {
+      const h = el("h2");
+      sl.title.split(/(\[[^\]]+\])/).forEach(part => { const mm = part.match(/^\[(.+)\]$/); h.append(mm ? el("span", { class: "reveal-word", text: mm[1] }) : part); });
+      node = el("div", { class: "sm-slide" }, el("div", { class: "sm-num", text: String(sl.i + 1) }), h, el("p", { text: sl.text || "" }), sl.verse ? el("div", { class: "sm-verse", text: sl.verse }) : null);
+    }
+    stage.replaceChildren(node);
+    $("#smDots").replaceChildren(...slides.map((_, k) => el("button", { class: k === si ? "on" : "", "aria-label": `Ir a ${k + 1}`, onclick: () => { si = k; renderSlide(); } })));
+    $("#smPrev").disabled = si === 0; $("#smNext").textContent = si === slides.length - 1 ? "Terminar" : "Siguiente →";
+  };
+  const smParticles = () => {
+    const cv = $("#smCanvas"), ctx = cv.getContext("2d");
+    const dpr = Math.min(devicePixelRatio || 1, 2); cv.width = innerWidth * dpr; cv.height = innerHeight * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const ps = Array.from({ length: 70 }, () => ({ x: Math.random() * innerWidth, y: Math.random() * innerHeight, r: Math.random() * 1.6 + .3, v: Math.random() * .3 + .05, t: Math.random() * 6 }));
+    const frame = () => {
+      if (smOv.hidden) return;
+      ctx.clearRect(0, 0, innerWidth, innerHeight);
+      for (const p of ps) { p.y -= p.v; p.t += .02; if (p.y < -5) { p.y = innerHeight + 5; p.x = Math.random() * innerWidth; } ctx.globalAlpha = .4 + Math.sin(p.t) * .3; ctx.fillStyle = "#f5c46b"; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill(); }
+      smAnim = requestAnimationFrame(frame);
+    };
+    if (!reduced) frame();
+  };
+  const openSermon = async () => {
+    si = 0; renderSlide(); openOv(smOv);
+    $("#smTitle").textContent = SER.title; $("#smPassage").textContent = SER.passage;
+    smT0 = Date.now(); $("#smClock").textContent = "00:00";
+    smTimer = setInterval(() => $("#smClock").textContent = fmtClock(Date.now() - smT0), 1000);
+    smParticles();
+    try { await smOv.requestFullscreen?.(); } catch {}
+    try { wake = await navigator.wakeLock?.request("screen"); } catch {}
+  };
+  const closeSermon = () => {
+    clearInterval(smTimer); cancelAnimationFrame(smAnim); try { wake?.release(); } catch {} wake = null;
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {});
+    closeOv(smOv);
+  };
+  $("#sermonOpen").addEventListener("click", openSermon);
+  $("#smClose").addEventListener("click", closeSermon);
+  $("#smPrev").addEventListener("click", () => { if (si > 0) { si--; renderSlide(); } });
+  $("#smNext").addEventListener("click", () => { if (si < slides.length - 1) { si++; renderSlide(); if (si === slides.length - 1) confetti(60); } else closeSermon(); });
+  addEventListener("keydown", (e) => {
+    if (smOv.hidden) return;
+    if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") { e.preventDefault(); $("#smNext").click(); }
+    if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); $("#smPrev").click(); }
+    if (e.key === "Escape") closeSermon();
+  });
+  document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && !smOv.hidden) { /* stay open in window */ } });
+
+  /* =========================================================
+     Youth live dynamics: team trivia + wheel
+     ========================================================= */
+  const TQ_SEC = 20, CIRC = 302;
+  const tv = { names: store.get("teams", ["Fuego", "Luz"]), score: [0, 0], qs: [], i: 0, timer: 0, left: 0 };
+  const trivia = $("#trivia");
+  const teamsBar = (award) => el("div", { class: "teams" }, ...[0, 1].map(k => {
+    const box = el("div", { class: "team " + (k ? "light" : "fire") },
+      el("input", { value: tv.names[k], "aria-label": "Nombre del equipo", maxlength: "16", oninput: (e) => { tv.names[k] = e.target.value || (k ? "Luz" : "Fuego"); store.set("teams", tv.names); } }),
+      el("b", { text: String(tv.score[k]) }));
+    if (award) box.append(el("button", { class: "btn btn-sm add " + (k ? "btn-light" : "btn-fire"), text: `+100 ${k ? "💧" : "🔥"}`, onclick: (e) => { tv.score[k] += 100; sparks(e.clientX, e.clientY); nextQ(); } }));
+    return box;
+  }));
+  const triviaSetup = () => {
+    tv.score = [0, 0]; tv.i = 0; tv.qs = shuffle(QUIZ).slice(0, 10);
+    trivia.replaceChildren(el("p", { class: "eyebrow eyebrow-neon", text: "Jóvenes Vida en Cristo" }), el("h2", { text: "Trivia bíblica por equipos" }), teamsBar(false),
+      el("p", { class: "small", style: "color:#a9a3c9;margin-bottom:1.4rem", text: "10 preguntas · 20 segundos cada una · El líder marca qué equipo acertó primero." }),
+      el("button", { class: "btn btn-neon", text: "¡Comenzar!", onclick: showQ }));
+  };
+  const showQ = () => {
+    const [q, opts] = tv.qs[tv.i]; tv.left = TQ_SEC;
+    const ring = el("div", { class: "ring-timer" });
+    ring.innerHTML = `<svg viewBox="0 0 110 110"><defs><linearGradient id="rtGrad"><stop offset="0" stop-color="#7c5cff"/><stop offset="1" stop-color="#2de2e6"/></linearGradient></defs><circle class="bg" cx="55" cy="55" r="48"/><circle class="fg" cx="55" cy="55" r="48" style="stroke-dashoffset:0"/></svg><span>${TQ_SEC}</span>`;
+    trivia.replaceChildren(teamsBar(false), el("p", { class: "small", style: "color:#a9a3c9", text: `Pregunta ${tv.i + 1} de ${tv.qs.length}` }), ring,
+      el("h2", { text: q }),
+      el("div", { class: "t-opts" }, ...opts.map((o, k) => el("div", { class: "t-opt" }, el("i", { text: "ABCD"[k] }), el("span", { text: o })))),
+      el("div", { class: "t-actions" }, el("button", { class: "btn btn-gold", text: "Revelar respuesta", onclick: reveal })));
+    clearInterval(tv.timer);
+    tv.timer = setInterval(() => {
+      tv.left--; $("span", ring).textContent = Math.max(0, tv.left);
+      $(".fg", ring).style.strokeDashoffset = CIRC * (1 - tv.left / TQ_SEC);
+      ring.classList.toggle("low", tv.left <= 5);
+      if (tv.left <= 0) reveal();
+    }, 1000);
+  };
+  const reveal = () => {
+    clearInterval(tv.timer);
+    const ans = tv.qs[tv.i][2];
+    $$(".t-opt", trivia).forEach((o, k) => o.classList.add(k === ans ? "right" : "dim"));
+    $(".t-actions", trivia).replaceChildren(el("p", { style: "width:100%;margin:0 0 .4rem;color:#a9a3c9", text: "¿Qué equipo acertó?" }), ...$$(".team .add", teamsBar(true)), el("button", { class: "btn btn-ghost", text: "Nadie", onclick: nextQ }));
+  };
+  const nextQ = () => {
+    tv.i++;
+    if (tv.i < tv.qs.length) { showQ(); return; }
+    const w = tv.score[0] === tv.score[1] ? null : tv.score[0] > tv.score[1] ? 0 : 1;
+    trivia.replaceChildren(el("p", { class: "eyebrow eyebrow-neon", text: "Resultado final" }),
+      el("div", { class: "winner", text: w === null ? "¡Empate! 🤝" : `¡Gana ${tv.names[w]}! ${w ? "💧" : "🔥"}` }), teamsBar(false),
+      el("button", { class: "btn btn-neon", text: "Jugar otra vez", onclick: triviaSetup }));
+    confetti(220);
+  };
+  $("#openTrivia").addEventListener("click", () => { triviaSetup(); openOv($("#triviaOv")); $("#triviaOv").requestFullscreen?.().catch(() => {}); });
+  $("#triviaOv").addEventListener("close", () => { clearInterval(tv.timer); if (document.fullscreenElement) document.exitFullscreen?.().catch(() => {}); });
+
+  const DEFAULT_WHEEL = ["Di tu versículo favorito", "Ora por la persona a tu derecha", "Canta el coro de una alabanza", "Cuenta un testimonio", "Menciona 3 libros del A.T.", "Abraza a alguien 🤗", "Recita Juan 3:16", "Di algo bueno de alguien del grupo"];
+  const wItems = $("#wheelItems"), wCv = $("#wheelCanvas"), wCtx = wCv.getContext("2d");
+  wItems.value = store.get("wheel", DEFAULT_WHEEL).join("\n");
+  const WCOL = ["#7c5cff", "#2de2e6", "#ff5e8a", "#f5a623", "#3d86c6", "#5fae6e", "#e89b3c", "#a855f7"];
+  let wAngle = 0, spinning = false;
+  const items = () => wItems.value.split("\n").map(x => x.trim()).filter(Boolean).slice(0, 24);
+  const drawWheel = () => {
+    const it = items(), n = Math.max(it.length, 1), R = 270, c = 280; wCtx.clearRect(0, 0, 560, 560);
+    for (let k = 0; k < n; k++) {
+      const a0 = wAngle + k * 2 * Math.PI / n, a1 = a0 + 2 * Math.PI / n;
+      wCtx.beginPath(); wCtx.moveTo(c, c); wCtx.arc(c, c, R, a0, a1); wCtx.closePath();
+      wCtx.fillStyle = WCOL[k % WCOL.length]; wCtx.fill(); wCtx.strokeStyle = "rgba(255,255,255,.35)"; wCtx.lineWidth = 2; wCtx.stroke();
+      wCtx.save(); wCtx.translate(c, c); wCtx.rotate(a0 + Math.PI / n); wCtx.textAlign = "right"; wCtx.fillStyle = "#fff";
+      const label = (it[k] || "Agrega opciones").slice(0, 34), maxW = R - 18 - 62;
+      let fs = n > 12 ? 15 : 19; do { wCtx.font = `700 ${fs}px Inter, sans-serif`; } while (wCtx.measureText(label).width > maxW && --fs > 9);
+      wCtx.fillText(label, R - 18, fs / 3); wCtx.restore();
+    }
+    wCtx.beginPath(); wCtx.arc(c, c, R, 0, 7); wCtx.strokeStyle = "#ffd56b"; wCtx.lineWidth = 8; wCtx.stroke();
+  };
+  wItems.addEventListener("input", () => { store.set("wheel", items()); drawWheel(); });
+  $("#wheelSpin").addEventListener("click", () => {
+    const it = items(); if (spinning || it.length < 2) return;
+    spinning = true; $("#wheelSpin").disabled = true; const res = $("#wheelResult"); res.classList.remove("on"); res.textContent = "…";
+    const start = wAngle, total = (6 + Math.random() * 4) * 2 * Math.PI, dur = reduced ? 10 : 5200, t0 = performance.now();
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / dur); wAngle = start + total * (1 - Math.pow(1 - k, 4)); drawWheel();
+      if (k < 1) { requestAnimationFrame(step); return; }
+      const n = it.length, pointer = -Math.PI / 2;
+      const idx = Math.floor((((pointer - wAngle) % (2 * Math.PI) + 4 * Math.PI) % (2 * Math.PI)) / (2 * Math.PI / n));
+      res.textContent = "🎉 " + it[idx]; res.classList.add("on"); confetti(140);
+      spinning = false; $("#wheelSpin").disabled = false;
+    };
+    requestAnimationFrame(step);
+  });
+  $("#openWheel").addEventListener("click", () => { openOv($("#wheelOv")); drawWheel(); });
 })();
